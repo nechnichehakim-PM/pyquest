@@ -1,0 +1,1710 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="dark">
+<meta name="description" content="PyQuest — apprends Python en RPG : un chemin de dalles-défis, des monstres gardiens de grands projets.">
+<title>PyQuest — De Nul à Expert en Python</title>
+</head>
+<body>
+<style>
+:root{
+  --nuit:#0B1020; --panneau:#131A2E; --panneau2:#0E1424; --bord:#25304D;
+  --bleu:#4B8BBE; --or:#FFD43B; --ok:#7EE787; --ko:#FF6B6B; --texte:#E6EDF7; --doux:#8DA0C4;
+  --mono:"Cascadia Code",Consolas,"Courier New",monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:radial-gradient(1200px 800px at 50% -10%,#16223F 0%,var(--nuit) 55%,#070A14 100%);
+  color:var(--texte);font-family:"Segoe UI",system-ui,sans-serif;min-height:100vh;overflow-x:hidden}
+button{font-family:inherit;cursor:pointer;border:none}
+.screen{display:none;min-height:100vh;padding:1.5rem;position:relative;z-index:2}
+.screen.active{display:block}
+#fx{position:fixed;inset:0;pointer-events:none;z-index:50}
+
+/* ---------- étoiles de fond ---------- */
+.stars{position:fixed;inset:0;z-index:0;pointer-events:none}
+.stars span{position:absolute;width:2px;height:2px;border-radius:50%;background:#cfd8ff;animation:tw 4s ease-in-out infinite}
+@keyframes tw{0%,100%{opacity:.15}50%{opacity:.9}}
+
+/* ---------- écran titre ---------- */
+#screen-title{display:none;text-align:center}
+#screen-title.active{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.2rem}
+.logo{font-family:var(--mono);font-size:clamp(2.6rem,9vw,5.2rem);font-weight:800;letter-spacing:.04em;margin:0;
+  background:linear-gradient(180deg,var(--or) 20%,#F0A93B 50%,var(--bleu) 55%,#7FB6E8 100%);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  filter:drop-shadow(0 0 22px rgba(75,139,190,.55)) drop-shadow(0 4px 0 rgba(0,0,0,.5));
+  animation:logoIn 1s cubic-bezier(.2,.9,.3,1.2) both}
+@keyframes logoIn{from{transform:translateY(-30px) scale(.85) rotateX(35deg);opacity:0}to{transform:none;opacity:1}}
+.tagline{color:var(--doux);font-size:1.05rem;margin:0;max-width:38rem;line-height:1.6}
+.tagline b{color:var(--or)}
+.btn-big{background:linear-gradient(180deg,#FFE27A,var(--or) 60%,#E4B41F);color:#221A02;font-weight:700;font-size:1.15rem;
+  padding:.9rem 2.4rem;border-radius:12px;box-shadow:0 6px 0 #A67F0E,0 14px 34px rgba(255,212,59,.35);transition:transform .12s,box-shadow .12s}
+.btn-big:hover{transform:translateY(-2px)}
+.btn-big:active{transform:translateY(3px);box-shadow:0 2px 0 #A67F0E}
+.plan{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.6rem;max-width:60rem;width:100%;margin-top:1.2rem}
+.plan div{background:rgba(19,26,46,.8);border:1px solid var(--bord);border-radius:10px;padding:.6rem .7rem;font-size:.8rem;text-align:left}
+.plan b{color:var(--or);display:block;font-size:.7rem;letter-spacing:.14em;text-transform:uppercase;margin-bottom:.2rem}
+
+/* ---------- HUD ---------- */
+.hud{display:flex;align-items:center;justify-content:space-between;gap:1rem;max-width:72rem;margin:0 auto 1.2rem;flex-wrap:wrap}
+.hud .rank{font-weight:700;color:var(--or)}
+.hud .xp{color:var(--doux);font-variant-numeric:tabular-nums}
+.btn-ghost{background:transparent;border:1px solid var(--bord);color:var(--doux);border-radius:8px;padding:.4rem .9rem;font-size:.85rem;transition:border-color .15s,color .15s}
+.btn-ghost:hover{border-color:var(--bleu);color:var(--texte)}
+
+/* ---------- carte du monde ---------- */
+.map-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1.1rem;max-width:72rem;margin:0 auto;perspective:1200px}
+.chap{background:linear-gradient(160deg,var(--panneau),var(--panneau2));border:1px solid var(--bord);border-radius:16px;
+  padding:1.1rem 1.2rem;position:relative;transform-style:preserve-3d;transition:transform .18s ease,box-shadow .18s,border-color .18s;text-align:left;color:var(--texte)}
+.chap:not(.locked):hover{border-color:var(--bleu);box-shadow:0 18px 44px rgba(0,0,0,.5),0 0 24px rgba(75,139,190,.25)}
+.chap .spr{font-size:2.6rem;display:block;filter:drop-shadow(0 6px 10px rgba(0,0,0,.6))}
+.chap h3{margin:.4rem 0 .2rem;font-size:1.05rem}
+.chap p{margin:0;color:var(--doux);font-size:.83rem;line-height:1.45}
+.chap .jour{position:absolute;top:.8rem;right:.9rem;font-size:.68rem;letter-spacing:.16em;color:var(--or);border:1px solid rgba(255,212,59,.4);
+  border-radius:99px;padding:.15rem .55rem;text-transform:uppercase}
+.chap .etat{margin-top:.6rem;font-size:.8rem;color:var(--ok)}
+.chap.locked{opacity:.45;filter:grayscale(.7);cursor:not-allowed}
+.chap.done{border-color:rgba(126,231,135,.5)}
+
+/* ---------- combat ---------- */
+.battle-wrap{max-width:72rem;margin:0 auto}
+.arena{perspective:950px;background:linear-gradient(180deg,rgba(22,34,63,.6),rgba(11,16,32,.9));
+  border:1px solid var(--bord);border-radius:18px;padding:1.2rem 1.6rem;display:flex;align-items:center;justify-content:space-between;
+  gap:1rem;min-height:180px;position:relative;overflow:hidden}
+.arena::before{content:"";position:absolute;left:-10%;right:-10%;bottom:-70px;height:130px;
+  background:radial-gradient(60% 100% at 50% 0%,rgba(75,139,190,.28),transparent 70%);transform:rotateX(60deg)}
+.fighter{display:flex;flex-direction:column;align-items:center;gap:.5rem;transform-style:preserve-3d}
+.sprite{font-size:4.6rem;line-height:1;filter:drop-shadow(0 14px 16px rgba(0,0,0,.65));transform-style:preserve-3d;animation:float 3.2s ease-in-out infinite}
+#enemy-sprite{animation:floatE 2.8s ease-in-out infinite}
+@keyframes float{0%,100%{transform:translateY(0) rotateY(-8deg)}50%{transform:translateY(-9px) rotateY(8deg)}}
+@keyframes floatE{0%,100%{transform:translateY(0) rotateY(10deg) rotateZ(-2deg)}50%{transform:translateY(-12px) rotateY(-10deg) rotateZ(2deg)}}
+.sprite.hit{animation:hitE .5s ease both !important}
+@keyframes hitE{0%{transform:scale(1)}25%{transform:scale(1.25) rotateZ(8deg);filter:drop-shadow(0 0 26px rgba(255,212,59,.9)) brightness(2)}60%{transform:scale(.92) rotateZ(-6deg)}100%{transform:scale(1)}}
+.sprite.dead{animation:die 1s ease both !important}
+@keyframes die{to{transform:translateY(40px) rotateZ(90deg) scale(.3);opacity:0}}
+.fname{font-weight:700;font-size:.95rem}
+.pips{display:flex;gap:.4rem}
+.pip{width:20px;height:20px;background:linear-gradient(180deg,#FF9B9B,var(--ko));clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%);transition:opacity .3s,transform .3s}
+.pip.off{opacity:.15;transform:scale(.6)}
+.hpbar{width:170px;height:12px;background:#0A0E1B;border:1px solid var(--bord);border-radius:99px;overflow:hidden}
+.hpbar i{display:block;height:100%;background:linear-gradient(90deg,#4BD07C,var(--ok));border-radius:99px;transition:width .4s cubic-bezier(.2,.9,.3,1.2)}
+.hptxt{font-size:.75rem;color:var(--doux);font-variant-numeric:tabular-nums}
+.vs{font-family:var(--mono);font-weight:800;font-size:1.4rem;color:var(--or);text-shadow:0 0 18px rgba(255,212,59,.6)}
+.shake{animation:shake .45s ease}
+@keyframes shake{0%,100%{transform:translate(0)}20%{transform:translate(-9px,3px)}40%{transform:translate(8px,-4px)}60%{transform:translate(-6px,2px)}80%{transform:translate(5px,-2px)}}
+.floater{position:fixed;font-family:var(--mono);font-weight:800;font-size:1.5rem;pointer-events:none;z-index:60;animation:fl 1s ease-out forwards}
+@keyframes fl{from{opacity:1;transform:translateY(0) scale(1)}to{opacity:0;transform:translateY(-70px) scale(1.4)}}
+
+/* ---------- panneau mission + éditeur ---------- */
+.duo{display:grid;grid-template-columns:minmax(300px,2fr) minmax(340px,3fr);gap:1.1rem;margin-top:1.1rem}
+@media(max-width:900px){.duo{grid-template-columns:1fr}}
+.panel{background:linear-gradient(160deg,var(--panneau),var(--panneau2));border:1px solid var(--bord);border-radius:16px;padding:1.1rem 1.3rem}
+.panel h2{margin:0 0 .3rem;font-size:1.05rem}
+.panel .eyebrow{font-size:.66rem;letter-spacing:.2em;text-transform:uppercase;color:var(--or);margin:0 0 .5rem}
+.lesson{color:var(--doux);font-size:.9rem;line-height:1.65}
+.lesson code,.task code{font-family:var(--mono);background:#0A0F1E;border:1px solid var(--bord);border-radius:6px;padding:.08rem .35rem;color:#9CDCFE;font-size:.84em}
+.lesson pre{background:#0A0F1E;border:1px solid var(--bord);border-radius:10px;padding:.7rem .9rem;overflow-x:auto;font-family:var(--mono);font-size:.82rem;color:#D4E5FF;line-height:1.55}
+.task{margin-top:.8rem;background:rgba(255,212,59,.07);border:1px solid rgba(255,212,59,.3);border-radius:10px;padding:.7rem .9rem;font-size:.9rem;line-height:1.6}
+.task b{color:var(--or)}
+.prog{font-size:.78rem;color:var(--doux);margin-top:.6rem}
+
+.edwrap{position:relative;border:1px solid var(--bord);border-radius:12px;background:#0A0F1E;overflow:hidden}
+.edwrap:focus-within{border-color:var(--bleu);box-shadow:0 0 0 3px rgba(75,139,190,.2)}
+#hl,#code{margin:0;padding:.9rem 1rem;font-family:var(--mono);font-size:.92rem;line-height:1.6;white-space:pre;tab-size:4;min-height:230px;width:100%}
+#hl{position:absolute;inset:0;overflow:hidden;pointer-events:none;color:#D4E5FF}
+#code{position:relative;background:transparent;color:transparent;caret-color:var(--or);border:none;outline:none;resize:vertical;overflow:auto;display:block}
+.k{color:#C586C0}.s{color:#CE9178}.n{color:#B5CEA8}.c{color:#6A9955;font-style:italic}.b{color:#DCDCAA}
+.btnrow{display:flex;gap:.6rem;margin-top:.8rem;flex-wrap:wrap;align-items:center}
+.btn-run{background:linear-gradient(180deg,#6FA8D6,var(--bleu) 60%,#39719C);color:#fff;font-weight:700;font-size:1rem;
+  padding:.65rem 1.6rem;border-radius:10px;box-shadow:0 4px 0 #2A5578;transition:transform .1s,box-shadow .1s}
+.btn-run:hover{filter:brightness(1.1)}
+.btn-run:active{transform:translateY(3px);box-shadow:0 1px 0 #2A5578}
+.hintkey{font-size:.72rem;color:var(--doux);margin-left:auto}
+.console{margin-top:.8rem;background:#070B16;border:1px solid var(--bord);border-radius:10px;padding:.7rem .9rem;
+  font-family:var(--mono);font-size:.85rem;min-height:88px;max-height:220px;overflow:auto;line-height:1.6;white-space:pre-wrap;word-break:break-word}
+.console .ok{color:var(--ok)}.console .err{color:var(--ko)}.console .dim{color:var(--doux)}
+.hintbox{margin-top:.7rem;background:rgba(75,139,190,.1);border:1px solid rgba(75,139,190,.4);border-radius:10px;padding:.6rem .9rem;font-size:.85rem;line-height:1.6;display:none}
+.hintbox.show{display:block;animation:pop .3s ease}
+@keyframes pop{from{transform:scale(.95);opacity:0}to{transform:none;opacity:1}}
+
+/* ---------- victoire ---------- */
+.overlay{position:fixed;inset:0;background:rgba(5,8,16,.86);backdrop-filter:blur(6px);z-index:80;display:none;align-items:center;justify-content:center;padding:1rem}
+.overlay.show{display:flex}
+.vcard{background:linear-gradient(165deg,#1A2440,var(--panneau2));border:1px solid rgba(255,212,59,.45);border-radius:20px;
+  padding:2.2rem 2.6rem;text-align:center;max-width:34rem;animation:vIn .6s cubic-bezier(.2,.9,.3,1.3) both;box-shadow:0 30px 80px rgba(0,0,0,.7),0 0 60px rgba(255,212,59,.15)}
+@keyframes vIn{from{transform:translateY(50px) scale(.8) rotateX(25deg);opacity:0}to{transform:none;opacity:1}}
+.vcard .spr{font-size:4rem;filter:drop-shadow(0 0 24px rgba(255,212,59,.5))}
+.vcard h2{font-size:1.7rem;margin:.4rem 0;color:var(--or)}
+.vcard p{color:var(--doux);line-height:1.65;font-size:.95rem}
+.vcard .next-steps{text-align:left;font-size:.86rem;background:rgba(75,139,190,.08);border:1px solid rgba(75,139,190,.3);border-radius:10px;padding:.8rem 1rem;margin:1rem 0}
+
+/* ---------- actes & nouveaux types de défis ---------- */
+.acte-head{max-width:72rem;margin:1.8rem auto .9rem}
+.acte-head h2{margin:0;font-size:1.25rem;color:var(--or);letter-spacing:.02em}
+.acte-head p{margin:.2rem 0 0;color:var(--doux);font-size:.82rem}
+.map-grid{margin-bottom:.4rem}
+.badge{display:inline-block;border-radius:99px;padding:.22rem .75rem;font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;font-weight:700;margin:0 .4rem .5rem 0}
+.b-debug{background:rgba(255,107,107,.12);border:1px solid rgba(255,107,107,.5);color:#FFB3B3}
+.b-predict{background:rgba(180,120,255,.12);border:1px solid rgba(180,120,255,.5);color:#D6BCFF}
+.b-hidden{background:rgba(255,212,59,.1);border:1px solid rgba(255,212,59,.45);color:#FFE58A}
+.b-timed{background:rgba(126,231,135,.1);border:1px solid rgba(126,231,135,.45);color:#A8F0AE}
+.showcode{background:#0A0F1E;border:1px solid var(--bord);border-radius:10px;padding:.7rem .9rem;overflow-x:auto;font-family:var(--mono);font-size:.84rem;color:#D4E5FF;line-height:1.6;margin:.7rem 0 0}
+@keyframes lungeE{0%{transform:translateX(0)}35%{transform:translateX(-52px) scale(1.2) rotateZ(-9deg);filter:drop-shadow(0 0 22px rgba(255,107,107,.9))}100%{transform:translateX(0)}}
+.sprite.lunge{animation:lungeE .55s ease both !important}
+#code::placeholder{color:#5A6B93}
+
+/* ---------- connexion ---------- */
+#screen-login.active{display:flex;align-items:center;justify-content:center}
+.lbox{background:linear-gradient(160deg,var(--panneau),var(--panneau2));border:1px solid var(--bord);border-radius:18px;
+  padding:2rem 2.2rem;max-width:24rem;width:100%;display:flex;flex-direction:column;gap:.7rem;text-align:center;
+  box-shadow:0 30px 80px rgba(0,0,0,.6)}
+.lbox h1{margin:0 0 .2rem}
+.lbox p{color:var(--doux);font-size:.88rem;line-height:1.55;margin:0 0 .4rem}
+.lbox input{background:#0A0F1E;border:1px solid var(--bord);border-radius:10px;color:var(--texte);
+  padding:.7rem .9rem;font-size:.95rem;font-family:inherit;outline:none}
+.lbox input:focus{border-color:var(--bleu);box-shadow:0 0 0 3px rgba(75,139,190,.2)}
+.lmsg{min-height:1.2rem;font-size:.85rem;color:var(--or)}
+
+/* ---------- sélection de héros ---------- */
+.cgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:1rem;margin-top:.5rem}
+.ccard{background:linear-gradient(165deg,var(--panneau),var(--panneau2));border:1px solid var(--bord);border-radius:16px;
+  padding:1.1rem .9rem;color:var(--texte);text-align:center;transition:transform .15s,border-color .15s,box-shadow .15s;position:relative}
+.ccard:hover{transform:translateY(-5px);border-color:var(--cc);box-shadow:0 16px 40px rgba(0,0,0,.5),0 0 26px color-mix(in srgb,var(--cc) 30%,transparent)}
+.ccard.sel{border-color:var(--cc);box-shadow:0 0 0 2px var(--cc),0 16px 40px rgba(0,0,0,.5)}
+.csprite{font-size:3.4rem;display:inline-block;filter:drop-shadow(0 8px 10px rgba(0,0,0,.6));line-height:1.2}
+.ccard h3{margin:.4rem 0 .1rem;font-size:1.1rem;color:var(--cc)}
+.ctag{margin:0 0 .6rem;color:var(--doux);font-size:.78rem;font-style:italic}
+.cstats{display:flex;flex-direction:column;gap:.3rem;margin-bottom:.6rem}
+.cstats div{display:flex;align-items:center;gap:.5rem;font-size:.68rem;color:var(--doux)}
+.cstats span{width:52px;text-align:right;flex:none}
+.cstats div{background:none}
+.cstats div i{display:block;height:6px;border-radius:99px;background:var(--cc);flex:none}
+.cperk{font-size:.76rem;line-height:1.5;background:rgba(255,255,255,.04);border:1px solid var(--bord);border-radius:8px;padding:.5rem .6rem;margin:0 0 .7rem;min-height:3.4rem}
+.cbtn{display:inline-block;background:var(--cc);color:#10131F;font-weight:700;border-radius:8px;padding:.4rem 1.2rem;font-size:.85rem}
+@keyframes idG{0%,100%{transform:translateY(0) rotate(0)}50%{transform:translateY(-6px) rotate(-6deg)}}
+@keyframes idR{0%,58%,100%{transform:translateX(-7px);opacity:1}60%{opacity:.25}62%{transform:translateX(8px);opacity:.25}64%{opacity:1}}
+@keyframes idM{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+@keyframes idO{0%,100%{transform:scale(1) translateY(0)}30%{transform:scale(1.1,.88) translateY(3px)}55%{transform:scale(.94,1.08) translateY(-8px)}75%{transform:scale(1.06,.94) translateY(1px)}}
+@keyframes idH{0%,100%{transform:translateY(0);filter:drop-shadow(0 0 5px #7EE787)}50%{transform:translateY(-9px);filter:drop-shadow(0 0 20px #7EE787)}}
+.idle-guerrier{animation:idG 1.3s ease-in-out infinite}
+.idle-rogue{animation:idR 2.2s ease-in-out infinite}
+.idle-mage{animation:idM 2.6s ease-in-out infinite}
+.idle-orc{animation:idO 1.1s ease-in-out infinite}
+.idle-heal{animation:idH 2.4s ease-in-out infinite}
+
+/* ---------- monde 2D ---------- */
+.world-wrap{position:relative;max-width:72rem;margin:0 auto;border:1px solid var(--bord);border-radius:14px;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,.5)}
+#world{display:block;width:100%;height:auto;image-rendering:auto;background:#0B0E18}
+.prompt{position:absolute;left:50%;bottom:14px;transform:translateX(-50%) translateY(70px);background:rgba(10,14,27,.92);
+  border:1px solid var(--or);border-radius:12px;padding:.55rem 1.1rem;font-size:.9rem;white-space:nowrap;transition:transform .2s;max-width:92%;overflow:hidden;text-overflow:ellipsis}
+.prompt.show{transform:translateX(-50%) translateY(0)}
+.prompt.click{cursor:pointer}
+.prompt b{color:var(--or)}
+.prompt span{color:var(--doux);font-size:.78rem;margin-left:.4rem}
+.mapkeys{max-width:72rem;margin:.7rem auto 0;color:var(--doux);font-size:.8rem;text-align:center}
+.dpad{position:absolute;right:12px;bottom:12px;display:none;flex-direction:column;align-items:center;gap:4px;z-index:5}
+.dpad div{display:flex;gap:4px}
+.dpad button{width:46px;height:46px;border-radius:10px;background:rgba(19,26,46,.85);border:1px solid var(--bord);color:var(--texte);font-size:1.1rem}
+.dpad button.act{background:rgba(255,212,59,.25);border-color:var(--or);color:var(--or);font-weight:800}
+@media(pointer:coarse){.dpad{display:flex}}
+
+/* ---------- attaques par classe ---------- */
+@keyframes atkCharge{0%{transform:none}45%{transform:translate(var(--dx),var(--dy)) rotate(28deg) scale(1.18)}100%{transform:none}}
+.sprite.atk-charge{animation:atkCharge .5s cubic-bezier(.3,0,.4,1) both !important}
+@keyframes atkDash{0%{opacity:1}18%{opacity:0}20%{transform:translate(var(--dx),var(--dy)) scaleX(-1.1) scaleY(1.1);opacity:.9}42%{opacity:0}46%{transform:none;opacity:0}60%{opacity:1}74%{opacity:.2}88%{opacity:1}100%{opacity:1;transform:none}}
+.sprite.atk-dash{animation:atkDash .75s ease both !important}
+@keyframes atkSlam{0%{transform:none}30%{transform:translateY(-58px) rotate(-12deg) scale(1.22)}55%{transform:translateY(8px) scale(1.3,.75)}75%{transform:translateY(-4px) scale(.95,1.08)}100%{transform:none}}
+.sprite.atk-slam{animation:atkSlam .6s ease both !important}
+@keyframes atkHoly{0%{transform:none;filter:none}40%{transform:translateY(-14px) scale(1.18);filter:drop-shadow(0 0 34px #9CFFB0) brightness(1.9)}100%{transform:none;filter:none}}
+.sprite.atk-holy{animation:atkHoly .55s ease both !important}
+.orb{position:fixed;width:22px;height:22px;border-radius:50%;z-index:70;pointer-events:none;transition:left .32s ease-in,top .32s ease-in}
+</style>
+
+<div class="stars" id="stars"></div>
+<canvas id="fx"></canvas>
+
+<!-- ============ CONNEXION ============ -->
+<section class="screen" id="screen-login">
+  <div class="lbox">
+    <h1 class="logo" style="font-size:2.4rem">⚔ PyQuest ⚔</h1>
+    <p>Crée ton compte pour sauvegarder ta progression en ligne, la retrouver sur n'importe quel appareil et apparaître au <b>🏆 classement</b> entre potes.</p>
+    <input id="l-pseudo" placeholder="Ton pseudo (affiché au classement)" maxlength="20" autocomplete="nickname">
+    <input id="l-email" type="email" placeholder="Email" autocomplete="email">
+    <input id="l-pass" type="password" placeholder="Mot de passe (6 caractères min.)" autocomplete="current-password">
+    <div class="lmsg" id="l-msg"></div>
+    <button class="btn-big" id="btn-login">Se connecter</button>
+    <button class="btn-ghost" id="btn-signup">✨ Créer un compte</button>
+    <button class="btn-ghost" id="btn-guest">Jouer en invité (sauvegarde locale seulement)</button>
+  </div>
+</section>
+
+<!-- ============ TITRE ============ -->
+<section class="screen active" id="screen-title">
+  <h1 class="logo">⚔ PyQuest ⚔</h1>
+  <p class="tagline">Trois actes. Un chemin pavé de <b>54 dalles-défis 💠</b> : chaque dalle est un défi de vrai code Python, et tu ne peux avancer qu'en la franchissant. Au bout de chaque route, un des <b>18 monstres</b> garde un <b>GRAND PROJET 🏗️</b> qui assemble tout ce que tu viens d'apprendre. Défis debug 🐛, prédiction 🔮, boss chrono ⏱️, tests cachés 🎭 — et en fil rouge, tu construis <b>ton propre RPG en Python</b>.</p>
+  <button class="btn-big" id="btn-start">▶ Commencer l'aventure</button>
+  <div class="plan">
+    <div><b>Acte I · Semaine 1</b>print, variables, conditions, boucles, listes, dictionnaires, fonctions, classes — les fondations</div>
+    <div><b>Acte II · Semaine 2</b>ton RPG commence · try/except · compréhensions · algorithmes à la main · défis debug · premier boss chrono</div>
+    <div><b>Acte III · Semaine 3</b>héritage · piles &amp; files · récursivité · tri · défis d'entretien à tests cachés · assemblage final de ton RPG</div>
+  </div>
+</section>
+
+<!-- ============ SÉLECTION DU HÉROS ============ -->
+<section class="screen" id="screen-select">
+  <div style="max-width:72rem;margin:0 auto;text-align:center">
+    <p style="color:var(--or);letter-spacing:.22em;text-transform:uppercase;font-size:.7rem;margin:0">Choisis ton héros</p>
+    <h2 style="font-size:1.7rem;margin:.25rem 0 .3rem">Cinq héros, cinq styles de jeu</h2>
+    <p style="color:var(--doux);font-size:.9rem;margin:0 0 1.2rem">Chaque héros a ses animations, son attaque… et un vrai pouvoir qui change ta façon de jouer. Tu pourras en changer à tout moment.</p>
+    <div class="cgrid" id="classes"></div>
+  </div>
+</section>
+
+<!-- ============ CARTE DU MONDE 2D ============ -->
+<section class="screen" id="screen-map">
+  <div class="hud">
+    <div><span class="rank" id="rank1">Nul en Python</span> · <span class="xp" id="xp1">0 XP</span> <span class="xp" id="hud-user"></span></div>
+    <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+      <button class="btn-ghost" id="btn-board">🏆 Classement</button>
+      <button class="btn-ghost" id="btn-hero">🎭 Changer de héros</button>
+      <button class="btn-ghost" id="btn-mute">🔊 Son</button>
+      <button class="btn-ghost" id="btn-reset">↺ Tout recommencer</button>
+      <button class="btn-ghost" id="btn-logout" style="display:none">🚪 Déconnexion</button>
+    </div>
+  </div>
+  <div class="world-wrap">
+    <canvas id="world" width="960" height="560"></canvas>
+    <div class="prompt" id="prompt"></div>
+    <div class="dpad" id="dpad">
+      <button data-k="up">▲</button>
+      <div><button data-k="left">◀</button><button data-k="int" class="act">E</button><button data-k="right">▶</button></div>
+      <button data-k="down">▼</button>
+    </div>
+  </div>
+  <p class="mapkeys">🚶 Déplace-toi : <b>flèches</b> ou <b>ZQSD</b> · défi ou projet : <b>E</b> ou <b>Entrée</b> · chaque dalle 💠 = un défi qui ouvre le passage · chaque monstre = un GRAND PROJET 🏗️</p>
+</section>
+
+<!-- ============ COMBAT ============ -->
+<section class="screen" id="screen-battle">
+  <div class="battle-wrap">
+    <div class="hud">
+      <button class="btn-ghost" id="btn-back">← Carte</button>
+      <div><span class="rank" id="rank2">Nul en Python</span> · <span class="xp" id="xp2">0 XP</span></div>
+    </div>
+    <div class="arena" id="arena">
+      <div class="fighter">
+        <div class="sprite" id="player-sprite">🧙</div>
+        <div class="fname" id="player-name">Toi, Mage du Code</div>
+        <div class="hpbar"><i id="php" style="width:100%"></i></div>
+        <div class="hptxt" id="phptxt">PV 100 / 100</div>
+      </div>
+      <div class="vs">VS</div>
+      <div class="fighter">
+        <div class="sprite" id="enemy-sprite">👾</div>
+        <div class="fname" id="enemy-name">???</div>
+        <div class="pips" id="pips"></div>
+      </div>
+    </div>
+    <div class="duo">
+      <div class="panel">
+        <p class="eyebrow" id="ch-eyebrow">Chapitre 1 · Jour 1</p>
+        <h2 id="ch-title">—</h2>
+        <div class="lesson" id="lesson"></div>
+        <div class="task" id="task"></div>
+        <p class="prog" id="prog">Défi 1/3</p>
+      </div>
+      <div class="panel">
+        <p class="eyebrow">Grimoire — écris ton sort en Python</p>
+        <div class="edwrap">
+          <pre id="hl" aria-hidden="true"></pre>
+          <textarea id="code" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
+        </div>
+        <div class="btnrow">
+          <button class="btn-run" id="btn-run">⚡ Lancer le sort</button>
+          <button class="btn-ghost" id="btn-hint">💡 Indice</button>
+          <button class="btn-ghost" id="btn-sol">📜 Solution</button>
+          <span class="hintkey">Ctrl + Entrée</span>
+        </div>
+        <div class="hintbox" id="hintbox"></div>
+        <div class="console" id="console"><span class="dim">La sortie de ton programme s'affichera ici…</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ VICTOIRE ============ -->
+<div class="overlay" id="overlay">
+  <div class="vcard" id="vcard"></div>
+</div>
+
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="content/base.js"></script>
+<script src="content/extensions.js"></script>
+<script>
+'use strict';
+/* ================================================================
+   MINI-INTERPRÉTEUR PYTHON (sous-ensemble pédagogique)
+   ================================================================ */
+function PyError(msg,line){this.msg=msg;this.line=line;}
+const KW=new Set(['and','or','not','in','is','True','False','None','if','elif','else','while','for','def','return','break','continue','pass','class']);
+const OPS=['**=','//=','**','//','==','!=','<=','>=','+=','-=','*=','/=','%=','(',')','[',']','{','}',',',':','.','+','-','*','/','%','<','>','='];
+
+function tokenize(src,line){
+  const T=[];let i=0;
+  while(i<src.length){
+    const c=src[i];
+    if(c===' '||c==='\t'){i++;continue;}
+    if(c==='#')break;
+    if(/[0-9]/.test(c)||(c==='.'&&/[0-9]/.test(src[i+1]||''))){
+      let j=i;while(j<src.length&&/[0-9.]/.test(src[j]))j++;
+      T.push({t:'num',v:parseFloat(src.slice(i,j))});i=j;continue;
+    }
+    if(c==='"'||c==="'"){const r=readStr(src,i,c,line);T.push({t:'str',v:r.v,f:false});i=r.i;continue;}
+    if(/[A-Za-zÀ-ÿ_]/.test(c)){
+      let j=i;while(j<src.length&&/[A-Za-z0-9À-ÿ_]/.test(src[j]))j++;
+      const w=src.slice(i,j);
+      if((w==='f'||w==='F')&&(src[j]==='"'||src[j]==="'")){const r=readStr(src,j,src[j],line);T.push({t:'str',v:r.v,f:true});i=r.i;continue;}
+      T.push(KW.has(w)?{t:'kw',v:w}:{t:'name',v:w});i=j;continue;
+    }
+    let matched=false;
+    for(const op of OPS){if(src.startsWith(op,i)){T.push({t:'op',v:op});i+=op.length;matched=true;break;}}
+    if(!matched)throw new PyError("SyntaxError : caractère inattendu « "+c+" »",line);
+  }
+  return T;
+}
+function readStr(src,i,q,line){
+  let v='';i++;
+  while(i<src.length){
+    const c=src[i];
+    if(c==='\\'){const n=src[i+1];v+=n==='n'?'\n':n==='t'?'\t':n;i+=2;continue;}
+    if(c===q)return{v,i:i+1};
+    v+=c;i++;
+  }
+  throw new PyError("SyntaxError : guillemet fermant manquant "+q,line);
+}
+
+/* ---------- parseur d'expressions (Pratt) ---------- */
+function ExprParser(toks,line){this.T=toks;this.p=0;this.line=line;}
+ExprParser.prototype={
+  peek(){return this.T[this.p]||null;},
+  next(){return this.T[this.p++]||null;},
+  isOp(v){const t=this.peek();return t&&t.t==='op'&&t.v===v;},
+  isKw(v){const t=this.peek();return t&&t.t==='kw'&&t.v===v;},
+  eat(v){if(!this.isOp(v))throw new PyError("SyntaxError : « "+v+" » attendu",this.line);this.p++;},
+  expr(){return this.or_();},
+  or_(){let l=this.and_();while(this.isKw('or')){this.p++;l={y:'or',a:l,b:this.and_()};}return l;},
+  and_(){let l=this.not_();while(this.isKw('and')){this.p++;l={y:'and',a:l,b:this.not_()};}return l;},
+  not_(){if(this.isKw('not')){this.p++;return{y:'not',a:this.not_()};}return this.cmp();},
+  cmp(){let l=this.add();
+    for(;;){const t=this.peek();
+      if(t&&t.t==='op'&&['==','!=','<','>','<=','>='].includes(t.v)){this.p++;l={y:'bin',op:t.v,a:l,b:this.add()};}
+      else if(t&&t.t==='kw'&&t.v==='in'){this.p++;l={y:'bin',op:'in',a:l,b:this.add()};}
+      else if(t&&t.t==='kw'&&t.v==='not'&&this.T[this.p+1]&&this.T[this.p+1].t==='kw'&&this.T[this.p+1].v==='in'){this.p+=2;l={y:'bin',op:'notin',a:l,b:this.add()};}
+      else if(t&&t.t==='kw'&&t.v==='is'){this.p++;l={y:'bin',op:'==',a:l,b:this.add()};}
+      else break;}
+    return l;},
+  add(){let l=this.mul();for(;;){if(this.isOp('+')){this.p++;l={y:'bin',op:'+',a:l,b:this.mul()};}else if(this.isOp('-')){this.p++;l={y:'bin',op:'-',a:l,b:this.mul()};}else break;}return l;},
+  mul(){let l=this.unary();for(;;){const t=this.peek();if(t&&t.t==='op'&&['*','/','//','%'].includes(t.v)){this.p++;l={y:'bin',op:t.v,a:l,b:this.unary()};}else break;}return l;},
+  unary(){if(this.isOp('-')){this.p++;return{y:'neg',a:this.unary()};}if(this.isOp('+')){this.p++;return this.unary();}return this.pow();},
+  pow(){const b=this.postfix();if(this.isOp('**')){this.p++;return{y:'bin',op:'**',a:b,b:this.unary()};}return b;},
+  postfix(){let e=this.primary();
+    for(;;){
+      if(this.isOp('(')){this.p++;const args=[];
+        if(!this.isOp(')'))for(;;){args.push(this.expr());if(this.isOp(',')){this.p++;continue;}break;}
+        this.eat(')');e={y:'call',f:e,args};}
+      else if(this.isOp('[')){this.p++;
+        let a=null,b=null,slice=false;
+        if(!this.isOp(':'))a=this.expr();
+        if(this.isOp(':')){this.p++;slice=true;if(!this.isOp(']'))b=this.expr();}
+        this.eat(']');e={y:'index',o:e,a,b,slice};}
+      else if(this.isOp('.')){this.p++;const t=this.next();
+        if(!t||(t.t!=='name'))throw new PyError("SyntaxError : nom attendu après le point",this.line);
+        e={y:'attr',o:e,name:t.v};}
+      else break;}
+    return e;},
+  primary(){const t=this.next();
+    if(!t)throw new PyError("SyntaxError : expression incomplète",this.line);
+    if(t.t==='num')return{y:'num',v:t.v};
+    if(t.t==='str')return t.f?{y:'fstr',v:t.v}:{y:'str',v:t.v};
+    if(t.t==='name')return{y:'name',v:t.v};
+    if(t.t==='kw'){
+      if(t.v==='True')return{y:'const',v:true};
+      if(t.v==='False')return{y:'const',v:false};
+      if(t.v==='None')return{y:'const',v:null};
+      if(t.v==='not')return{y:'not',a:this.not_()};
+      throw new PyError("SyntaxError : « "+t.v+" » inattendu ici",this.line);}
+    if(t.t==='op'&&t.v==='('){
+      const first=this.expr();
+      if(this.isOp(',')){const items=[first];while(this.isOp(',')){this.p++;if(this.isOp(')'))break;items.push(this.expr());}this.eat(')');return{y:'list',items};}
+      this.eat(')');return first;}
+    if(t.t==='op'&&t.v==='['){
+      if(this.isOp(']')){this.p++;return{y:'list',items:[]};}
+      const first=this.expr();
+      if(this.isKw('for')){
+        this.p++;const vt=this.next();
+        if(!vt||vt.t!=='name')throw new PyError("SyntaxError : variable attendue après « for » dans la compréhension",this.line);
+        if(!this.isKw('in'))throw new PyError("SyntaxError : « in » attendu dans la compréhension de liste",this.line);
+        this.p++;const iter=this.or_();
+        let cond=null;
+        if(this.isKw('if')){this.p++;cond=this.or_();}
+        this.eat(']');return{y:'comp',e:first,v:vt.v,iter,cond};}
+      const items=[first];
+      while(this.isOp(',')){this.p++;if(this.isOp(']'))break;items.push(this.expr());}
+      this.eat(']');return{y:'list',items};}
+    if(t.t==='op'&&t.v==='{'){
+      const pairs=[];
+      if(!this.isOp('}'))for(;;){const k=this.expr();this.eat(':');const v=this.expr();pairs.push([k,v]);
+        if(this.isOp(',')){this.p++;if(this.isOp('}'))break;continue;}break;}
+      this.eat('}');return{y:'dict',pairs};}
+    throw new PyError("SyntaxError : « "+(t.v??'?')+" » inattendu",this.line);}
+};
+function parseExprStr(s,line){
+  const p=new ExprParser(tokenize(s,line),line);
+  const e=p.expr();
+  if(p.peek())throw new PyError("SyntaxError : syntaxe invalide près de « "+(p.peek().v??'?')+" »",line);
+  return e;
+}
+
+/* ---------- parseur de programme (blocs par indentation) ---------- */
+function parseProgram(src){
+  const raw=src.replace(/\r/g,'').replace(/\t/g,'    ').split('\n');
+  const L=[];
+  for(let i=0;i<raw.length;i++){
+    const t=raw[i];const trimmed=t.trim();
+    if(!trimmed||trimmed.startsWith('#'))continue;
+    let ind=0;while(t[ind]===' ')ind++;
+    L.push({ind,txt:trimmed,no:i+1});
+  }
+  const pos={i:0};
+  const body=parseBlock(L,pos,L.length?L[0].ind:0);
+  if(pos.i<L.length)throw new PyError("IndentationError : indentation inattendue",L[pos.i].no);
+  return body;
+}
+function parseBlock(L,pos,ind){
+  const out=[];
+  while(pos.i<L.length){
+    const ln=L[pos.i];
+    if(ln.ind<ind)break;
+    if(ln.ind>ind)throw new PyError("IndentationError : trop d'espaces au début de la ligne",ln.no);
+    out.push(parseStmt(L,pos,ind));
+  }
+  return out;
+}
+function subBlock(L,pos,ind,no){
+  if(pos.i>=L.length||L[pos.i].ind<=ind)
+    throw new PyError("IndentationError : il manque un bloc indenté (ajoute 4 espaces au début des lignes suivantes)",no);
+  return parseBlock(L,pos,L[pos.i].ind);
+}
+function stripColon(s,no){
+  const t=s.trim();
+  if(!t.endsWith(':'))throw new PyError("SyntaxError : il manque les deux-points « : » à la fin de la ligne",no);
+  return t.slice(0,-1);
+}
+function parseStmt(L,pos,ind){
+  const ln=L[pos.i];const s=ln.txt;const no=ln.no;pos.i++;
+  if(s==='pass')return{k:'pass',no};
+  if(s==='break')return{k:'break',no};
+  if(s==='continue')return{k:'continue',no};
+  if(s==='return'||s.startsWith('return ')){
+    const rest=s.slice(6).trim();
+    return{k:'return',e:rest?parseExprStr(rest,no):null,no};}
+  if(s.startsWith('if ')||s==='if'){
+    const node={k:'if',clauses:[],els:null,no};
+    node.clauses.push({cond:parseExprStr(stripColon(s.slice(2),no),no),body:subBlock(L,pos,ind,no)});
+    for(;;){
+      if(pos.i<L.length&&L[pos.i].ind===ind&&L[pos.i].txt.startsWith('elif ')){
+        const l2=L[pos.i];pos.i++;
+        node.clauses.push({cond:parseExprStr(stripColon(l2.txt.slice(4),l2.no),l2.no),body:subBlock(L,pos,ind,l2.no)});
+      }else if(pos.i<L.length&&L[pos.i].ind===ind&&(L[pos.i].txt==='else:'||L[pos.i].txt==='else :')){
+        const l2=L[pos.i];pos.i++;
+        node.els=subBlock(L,pos,ind,l2.no);break;
+      }else break;}
+    return node;}
+  if(s.startsWith('while ')){
+    return{k:'while',cond:parseExprStr(stripColon(s.slice(5),no),no),body:subBlock(L,pos,ind,no),no};}
+  if(s.startsWith('for ')){
+    const h=stripColon(s.slice(4),no);
+    const m=h.match(/^(.+?)\s+in\s+(.+)$/);
+    if(!m)throw new PyError("SyntaxError : écris  for variable in quelque_chose:",no);
+    const targets=m[1].split(',').map(x=>x.trim());
+    for(const t of targets)if(!/^[A-Za-zÀ-ÿ_][A-Za-z0-9À-ÿ_]*$/.test(t))throw new PyError("SyntaxError : nom de variable invalide « "+t+" »",no);
+    return{k:'for',targets,iter:parseExprStr(m[2],no),body:subBlock(L,pos,ind,no),no};}
+  if(s.startsWith('def ')){
+    const h=stripColon(s.slice(4),no);
+    const m=h.match(/^([A-Za-zÀ-ÿ_][A-Za-z0-9À-ÿ_]*)\s*\((.*)\)$/);
+    if(!m)throw new PyError("SyntaxError : écris  def nom(param1, param2):",no);
+    const params=[];
+    if(m[2].trim())for(const part of m[2].split(',')){
+      const pm=part.trim().match(/^([A-Za-zÀ-ÿ_][A-Za-z0-9À-ÿ_]*)(?:\s*=\s*(.+))?$/);
+      if(!pm)throw new PyError("SyntaxError : paramètre invalide « "+part.trim()+" »",no);
+      params.push({name:pm[1],def:pm[2]?parseExprStr(pm[2],no):undefined});}
+    return{k:'def',name:m[1],params,body:subBlock(L,pos,ind,no),no};}
+  if(s.startsWith('class ')){
+    const h=stripColon(s.slice(6),no);
+    const m=h.match(/^([A-Za-zÀ-ÿ_][A-Za-z0-9À-ÿ_]*)\s*(?:\(\s*([A-Za-zÀ-ÿ_][A-Za-z0-9À-ÿ_]*)?\s*\))?$/);
+    if(!m)throw new PyError("SyntaxError : écris  class Nom:  ou  class Nom(Parent):",no);
+    return{k:'class',name:m[1],parent:m[2]||null,body:subBlock(L,pos,ind,no),no};}
+  if(s==='try:'||s==='try :'){
+    const body=subBlock(L,pos,ind,no);
+    const handlers=[];
+    while(pos.i<L.length&&L[pos.i].ind===ind&&L[pos.i].txt.startsWith('except')){
+      const l2=L[pos.i];pos.i++;
+      const h=stripColon(l2.txt.slice(6)||':',l2.no).trim();
+      const m=h.match(/^(?:([A-Za-z_][A-Za-z0-9_]*))?(?:\s+as\s+([A-Za-z_][A-Za-z0-9_]*))?$/);
+      if(!m)throw new PyError("SyntaxError : écris  except NomErreur:  ou  except:",l2.no);
+      handlers.push({name:(m[1]&&m[1]!=='Exception')?m[1]:null,as:m[2]||null,body:subBlock(L,pos,ind,l2.no)});}
+    if(!handlers.length)throw new PyError("SyntaxError : un bloc try doit être suivi d'un except",no);
+    return{k:'try',body,handlers,no};}
+  if(s.startsWith('except'))throw new PyError("SyntaxError : « except » sans « try » juste avant (même indentation ?)",no);
+  if(s==='raise'||s.startsWith('raise ')){
+    const rest=s.slice(5).trim();
+    const m=rest.match(/^([A-Za-z_][A-Za-z0-9_]*)\s*\((.*)\)$/);
+    if(!m)throw new PyError('SyntaxError : écris  raise NomErreur("message")',no);
+    return{k:'raise',ename:m[1],msg:m[2].trim()?parseExprStr(m[2],no):null,no};}
+  /* affectation ou expression */
+  const toks=tokenize(s,no);
+  let depth=0,ai=-1,aop=null;
+  for(let i=0;i<toks.length;i++){const t=toks[i];
+    if(t.t==='op'&&['(','[','{'].includes(t.v))depth++;
+    else if(t.t==='op'&&[')',']','}'].includes(t.v))depth--;
+    else if(depth===0&&t.t==='op'&&['=','+=','-=','*=','/=','//=','%=','**='].includes(t.v)){ai=i;aop=t.v;break;}}
+  if(ai>=0){
+    const lp=new ExprParser(toks.slice(0,ai),no);const target=lp.expr();
+    if(lp.peek())throw new PyError("SyntaxError : cible d'affectation invalide",no);
+    if(!['name','attr','index'].includes(target.y))throw new PyError("SyntaxError : on ne peut pas affecter à cette expression",no);
+    const rp=new ExprParser(toks.slice(ai+1),no);const val=rp.expr();
+    if(rp.peek())throw new PyError("SyntaxError : syntaxe invalide après « = »",no);
+    return{k:'assign',target,op:aop,e:val,no};}
+  const p=new ExprParser(toks,no);const e=p.expr();
+  if(p.peek())throw new PyError("SyntaxError : syntaxe invalide près de « "+(p.peek().v??'?')+" »",no);
+  return{k:'expr',e,no};
+}
+
+/* ---------- environnement & valeurs ---------- */
+function Env(parent){this.vars=Object.create(null);this.parent=parent;}
+Env.prototype.get=function(n,no){
+  let e=this;while(e){if(n in e.vars)return e.vars[n];e=e.parent;}
+  throw new PyError("NameError : le nom « "+n+" » n'est pas défini (l'as-tu créé avant de l'utiliser ?)",no);};
+Env.prototype.set=function(n,v){this.vars[n]=v;};
+
+function pyTruthy(v){
+  if(v===null||v===false)return false;
+  if(v===true)return true;
+  if(typeof v==='number')return v!==0;
+  if(typeof v==='string')return v.length>0;
+  if(Array.isArray(v))return v.length>0;
+  if(v instanceof Map)return v.size>0;
+  return true;}
+function pyEq(a,b){
+  if(Array.isArray(a)&&Array.isArray(b))return a.length===b.length&&a.every((x,i)=>pyEq(x,b[i]));
+  if(a instanceof Map&&b instanceof Map){if(a.size!==b.size)return false;for(const[k,v]of a){if(!b.has(k)||!pyEq(v,b.get(k)))return false;}return true;}
+  return a===b;}
+function numStr(v){if(Number.isInteger(v))return String(v);return String(parseFloat(v.toPrecision(12)));}
+function pyStr(v){
+  if(v===null)return'None';if(v===true)return'True';if(v===false)return'False';
+  if(typeof v==='number')return numStr(v);
+  if(typeof v==='string')return v;
+  if(Array.isArray(v))return'['+v.map(pyRepr).join(', ')+']';
+  if(v instanceof Map)return'{'+[...v].map(([k,x])=>pyRepr(k)+': '+pyRepr(x)).join(', ')+'}';
+  if(v&&v.pyType==='function')return'<fonction '+v.name+'>';
+  if(v&&v.pyType==='class')return"<classe '"+v.name+"'>";
+  if(v&&v.pyType==='instance')return'<objet '+v.cls.name+'>';
+  return String(v);}
+function pyRepr(v){if(typeof v==='string')return"'"+v+"'";return pyStr(v);}
+function typeName(v){
+  if(v===null)return'NoneType';if(typeof v==='boolean')return'bool';
+  if(typeof v==='number')return Number.isInteger(v)?'int':'float';
+  if(typeof v==='string')return'str';if(Array.isArray(v))return'list';
+  if(v instanceof Map)return'dict';
+  if(v&&v.pyType==='instance')return v.cls.name;
+  return'objet';}
+
+/* ---------- interpréteur ---------- */
+function Interp(out){this.out=out;this.ops=0;}
+Interp.prototype.tick=function(no){
+  if(++this.ops>400000)throw new PyError("Ton programme tourne sans fin (boucle infinie ?) — vérifie la condition de ta boucle while.",no);};
+
+Interp.prototype.execBlock=function(body,env){for(const st of body)this.execStmt(st,env);};
+Interp.prototype.execStmt=function(st,env){
+  this.tick(st.no);
+  switch(st.k){
+    case'pass':return;
+    case'expr':this.ev(st.e,env,st.no);return;
+    case'assign':{
+      let v;
+      if(st.op==='='){v=this.ev(st.e,env,st.no);}
+      else{
+        const cur=this.evalTarget(st.target,env,st.no);
+        const rhs=this.ev(st.e,env,st.no);
+        v=this.binop(st.op.slice(0,-1),cur,rhs,st.no);}
+      this.assign(st.target,v,env,st.no);return;}
+    case'if':{
+      for(const cl of st.clauses)if(pyTruthy(this.ev(cl.cond,env,st.no))){this.execBlock(cl.body,env);return;}
+      if(st.els)this.execBlock(st.els,env);return;}
+    case'while':{
+      while(pyTruthy(this.ev(st.cond,env,st.no))){
+        this.tick(st.no);
+        try{this.execBlock(st.body,env);}
+        catch(e){if(e&&e.brk)break;if(e&&e.cont)continue;throw e;}}
+      return;}
+    case'for':{
+      const it=this.iterable(this.ev(st.iter,env,st.no),st.no);
+      for(const item of it){
+        this.tick(st.no);
+        if(st.targets.length===1)env.set(st.targets[0],item);
+        else{
+          if(!Array.isArray(item)||item.length!==st.targets.length)
+            throw new PyError("ValueError : impossible de dépaqueter "+pyRepr(item)+" en "+st.targets.length+" variables",st.no);
+          st.targets.forEach((t,i)=>env.set(t,item[i]));}
+        try{this.execBlock(st.body,env);}
+        catch(e){if(e&&e.brk)break;if(e&&e.cont)continue;throw e;}}
+      return;}
+    case'def':{
+      const defaults={};
+      for(const p of st.params)if(p.def!==undefined)defaults[p.name]=this.ev(p.def,env,st.no);
+      env.set(st.name,{pyType:'function',name:st.name,params:st.params,defaults,body:st.body,closure:env});return;}
+    case'class':{
+      const cenv=new Env(env);this.execBlock(st.body,cenv);
+      const methods={};
+      for(const k in cenv.vars)if(cenv.vars[k]&&cenv.vars[k].pyType==='function')methods[k]=cenv.vars[k];
+      let parent=null;
+      if(st.parent){parent=env.get(st.parent,st.no);
+        if(!parent||parent.pyType!=='class')throw new PyError("TypeError : « "+st.parent+" » n'est pas une classe, impossible d'en hériter",st.no);}
+      env.set(st.name,{pyType:'class',name:st.name,methods,parent});return;}
+    case'try':{
+      try{this.execBlock(st.body,env);}
+      catch(e){
+        if(!(e instanceof PyError))throw e;
+        const ename=(e.msg.match(/^([A-Za-z]+Error)/)||[])[1]||'';
+        for(const h of st.handlers){
+          if(!h.name||h.name===ename){
+            if(h.as)env.set(h.as,e.msg);
+            this.execBlock(h.body,env);return;}}
+        throw e;}
+      return;}
+    case'raise':{
+      const m=st.msg?pyStr(this.ev(st.msg,env,st.no)):'';
+      throw new PyError(st.ename+(m?' : '+m:''),st.no);}
+    case'return':throw{ret:st.e?this.ev(st.e,env,st.no):null};
+    case'break':throw{brk:1};
+    case'continue':throw{cont:1};
+  }};
+Interp.prototype.iterable=function(v,no){
+  if(Array.isArray(v))return v.slice();
+  if(typeof v==='string')return v.split('');
+  if(v instanceof Map)return[...v.keys()];
+  throw new PyError("TypeError : on ne peut pas parcourir un objet de type "+typeName(v)+" avec une boucle for",no);};
+Interp.prototype.evalTarget=function(t,env,no){
+  if(t.y==='name')return env.get(t.v,no);
+  return this.ev(t,env,no);};
+Interp.prototype.assign=function(t,v,env,no){
+  if(t.y==='name'){env.set(t.v,v);return;}
+  if(t.y==='attr'){
+    const o=this.ev(t.o,env,no);
+    if(o&&o.pyType==='instance'){o.attrs[t.name]=v;return;}
+    throw new PyError("TypeError : impossible de définir un attribut sur un "+typeName(o),no);}
+  if(t.y==='index'){
+    const o=this.ev(t.o,env,no);const k=this.ev(t.a,env,no);
+    if(Array.isArray(o)){const i=this.normIdx(o,k,no);o[i]=v;return;}
+    if(o instanceof Map){o.set(k,v);return;}
+    throw new PyError("TypeError : on ne peut pas modifier un "+typeName(o)+" par index",no);}};
+Interp.prototype.normIdx=function(arr,k,no){
+  if(typeof k!=='number'||!Number.isInteger(k))throw new PyError("TypeError : les index doivent être des entiers, pas "+typeName(k),no);
+  const i=k<0?arr.length+k:k;
+  if(i<0||i>=arr.length)throw new PyError("IndexError : index "+k+" hors limites (la liste a "+arr.length+" éléments, index valides : 0 à "+(arr.length-1)+" ou négatifs)",no);
+  return i;};
+
+Interp.prototype.ev=function(e,env,no){
+  this.tick(no);
+  switch(e.y){
+    case'num':return e.v;
+    case'str':return e.v;
+    case'const':return e.v;
+    case'name':return env.get(e.v,no);
+    case'fstr':return this.fstring(e.v,env,no);
+    case'list':return e.items.map(x=>this.ev(x,env,no));
+    case'dict':{const m=new Map();for(const[k,v]of e.pairs)m.set(this.ev(k,env,no),this.ev(v,env,no));return m;}
+    case'comp':{
+      const it=this.iterable(this.ev(e.iter,env,no),no);
+      const r=[];
+      for(const item of it){this.tick(no);env.set(e.v,item);
+        if(e.cond&&!pyTruthy(this.ev(e.cond,env,no)))continue;
+        r.push(this.ev(e.e,env,no));}
+      return r;}
+    case'not':return!pyTruthy(this.ev(e.a,env,no));
+    case'neg':{const v=this.ev(e.a,env,no);if(typeof v!=='number')throw new PyError("TypeError : le signe - ne s'applique qu'aux nombres",no);return-v;}
+    case'and':{const a=this.ev(e.a,env,no);return pyTruthy(a)?this.ev(e.b,env,no):a;}
+    case'or':{const a=this.ev(e.a,env,no);return pyTruthy(a)?a:this.ev(e.b,env,no);}
+    case'bin':return this.binop(e.op,this.ev(e.a,env,no),this.ev(e.b,env,no),no);
+    case'attr':return this.getAttr(this.ev(e.o,env,no),e.name,no);
+    case'index':{
+      const o=this.ev(e.o,env,no);
+      if(e.slice){
+        const len=(Array.isArray(o)||typeof o==='string')?o.length:null;
+        if(len===null)throw new PyError("TypeError : découpage [a:b] impossible sur un "+typeName(o),no);
+        let a=e.a?this.ev(e.a,env,no):0,b=e.b?this.ev(e.b,env,no):len;
+        if(a<0)a=Math.max(0,len+a);if(b<0)b=Math.max(0,len+b);
+        return o.slice(a,b);}
+      const k=this.ev(e.a,env,no);
+      if(Array.isArray(o))return o[this.normIdx(o,k,no)];
+      if(typeof o==='string'){const i=k<0?o.length+k:k;if(i<0||i>=o.length)throw new PyError("IndexError : index "+k+" hors limites pour cette chaîne",no);return o[i];}
+      if(o instanceof Map){if(!o.has(k))throw new PyError("KeyError : la clé "+pyRepr(k)+" n'existe pas dans ce dictionnaire",no);return o.get(k);}
+      throw new PyError("TypeError : un "+typeName(o)+" ne supporte pas les crochets [ ]",no);}
+    case'call':return this.call(this.ev(e.f,env,no),e.args.map(a=>this.ev(a,env,no)),no);
+  }
+  throw new PyError("Erreur interne : expression inconnue",no);};
+
+Interp.prototype.binop=function(op,a,b,no){
+  const bothNum=typeof a==='number'&&typeof b==='number';
+  switch(op){
+    case'+':
+      if(bothNum)return a+b;
+      if(typeof a==='string'&&typeof b==='string')return a+b;
+      if(Array.isArray(a)&&Array.isArray(b))return a.concat(b);
+      throw new PyError("TypeError : impossible d'additionner "+typeName(a)+" et "+typeName(b)+" (astuce : convertis avec str(...) ou utilise une f-string)",no);
+    case'-':if(bothNum)return a-b;throw new PyError("TypeError : - impossible entre "+typeName(a)+" et "+typeName(b),no);
+    case'*':
+      if(bothNum)return a*b;
+      if(typeof a==='string'&&typeof b==='number')return a.repeat(Math.max(0,b));
+      if(typeof b==='string'&&typeof a==='number')return b.repeat(Math.max(0,a));
+      if(Array.isArray(a)&&typeof b==='number'){let r=[];for(let i=0;i<b;i++)r=r.concat(a);return r;}
+      throw new PyError("TypeError : * impossible entre "+typeName(a)+" et "+typeName(b),no);
+    case'/':if(bothNum){if(b===0)throw new PyError("ZeroDivisionError : division par zéro !",no);return a/b;}throw new PyError("TypeError : / impossible entre "+typeName(a)+" et "+typeName(b),no);
+    case'//':if(bothNum){if(b===0)throw new PyError("ZeroDivisionError : division par zéro !",no);return Math.floor(a/b);}throw new PyError("TypeError : // impossible ici",no);
+    case'%':if(bothNum){if(b===0)throw new PyError("ZeroDivisionError : modulo par zéro !",no);return((a%b)+b)%b;}throw new PyError("TypeError : % impossible entre "+typeName(a)+" et "+typeName(b),no);
+    case'**':if(bothNum)return Math.pow(a,b);throw new PyError("TypeError : ** impossible ici",no);
+    case'==':return pyEq(a,b);
+    case'!=':return!pyEq(a,b);
+    case'<':return a<b;case'>':return a>b;case'<=':return a<=b;case'>=':return a>=b;
+    case'in':return this.contains(b,a,no);
+    case'notin':return!this.contains(b,a,no);
+  }};
+Interp.prototype.contains=function(container,item,no){
+  if(typeof container==='string'){if(typeof item!=='string')throw new PyError("TypeError : « in » sur une chaîne demande une chaîne",no);return container.includes(item);}
+  if(Array.isArray(container))return container.some(x=>pyEq(x,item));
+  if(container instanceof Map)return container.has(item);
+  throw new PyError("TypeError : « in » impossible sur un "+typeName(container),no);};
+
+const STR_M=new Set(['upper','lower','replace','split','strip','count','join','startswith','endswith','capitalize','title','find']);
+const LIST_M=new Set(['append','pop','remove','sort','reverse','count','index','insert']);
+const DICT_M=new Set(['get','keys','values','items','pop']);
+Interp.prototype.getAttr=function(o,name,no){
+  if(o&&o.pyType==='instance'){
+    if(name in o.attrs)return o.attrs[name];
+    let c=o.cls;
+    while(c){if(c.methods[name])return{pyType:'bound',fn:c.methods[name],self:o};c=c.parent;}
+    throw new PyError("AttributeError : l'objet "+o.cls.name+" n'a pas d'attribut « "+name+" » (défini dans __init__ ?)",no);}
+  if(o&&o.pyType==='class'){
+    let c=o;while(c){if(c.methods[name])return c.methods[name];c=c.parent;}
+    throw new PyError("AttributeError : la classe "+o.name+" n'a pas de méthode « "+name+" »",no);}
+  if(typeof o==='string'&&STR_M.has(name))return{pyType:'natmeth',o,name};
+  if(Array.isArray(o)&&LIST_M.has(name))return{pyType:'natmeth',o,name};
+  if(o instanceof Map&&DICT_M.has(name))return{pyType:'natmeth',o,name};
+  throw new PyError("AttributeError : un "+typeName(o)+" n'a pas de méthode « "+name+" »",no);};
+
+Interp.prototype.call=function(f,args,no){
+  if(f&&f.pyType==='builtin')return f.fn(args,no,this);
+  if(f&&f.pyType==='function')return this.callFn(f,args,no);
+  if(f&&f.pyType==='bound')return this.callFn(f.fn,[f.self,...args],no);
+  if(f&&f.pyType==='class'){
+    const obj={pyType:'instance',cls:f,attrs:{}};
+    let c=f,init=null;
+    while(c&&!init){init=c.methods['__init__']||null;c=c.parent;}
+    if(init)this.callFn(init,[obj,...args],no);
+    else if(args.length)throw new PyError("TypeError : "+f.name+"() ne prend pas d'argument (pas de __init__)",no);
+    return obj;}
+  if(f&&f.pyType==='natmeth')return this.nativeMethod(f.o,f.name,args,no);
+  throw new PyError("TypeError : un "+typeName(f)+" n'est pas appelable (as-tu oublié def ?)",no);};
+Interp.prototype.callFn=function(fn,args,no){
+  const env=new Env(fn.closure);
+  const req=fn.params.filter(p=>p.def===undefined).length;
+  if(args.length<req||args.length>fn.params.length)
+    throw new PyError("TypeError : "+fn.name+"() attend "+(req===fn.params.length?req:req+" à "+fn.params.length)+" argument(s), mais en a reçu "+args.length,no);
+  fn.params.forEach((p,i)=>{env.set(p.name,i<args.length?args[i]:fn.defaults[p.name]);});
+  try{this.execBlock(fn.body,env);}
+  catch(e){if(e&&'ret'in e)return e.ret;throw e;}
+  return null;};
+Interp.prototype.nativeMethod=function(o,name,a,no){
+  if(typeof o==='string'){
+    switch(name){
+      case'upper':return o.toUpperCase();case'lower':return o.toLowerCase();
+      case'replace':return o.split(a[0]).join(a[1]);
+      case'split':return a.length?o.split(a[0]):o.trim().split(/\s+/).filter(Boolean);
+      case'strip':return o.trim();case'count':{if(!a[0])return 0;return o.split(a[0]).length-1;}
+      case'join':return a[0].map(pyStr).join(o);
+      case'startswith':return o.startsWith(a[0]);case'endswith':return o.endsWith(a[0]);
+      case'capitalize':return o.charAt(0).toUpperCase()+o.slice(1).toLowerCase();
+      case'title':return o.replace(/\p{L}[\p{L}']*/gu,w=>w[0].toUpperCase()+w.slice(1).toLowerCase());
+      case'find':return o.indexOf(a[0]);}}
+  if(Array.isArray(o)){
+    switch(name){
+      case'append':o.push(a[0]);return null;
+      case'pop':{if(!o.length)throw new PyError("IndexError : pop sur une liste vide",no);
+        if(a.length){const i=this.normIdx(o,a[0],no);return o.splice(i,1)[0];}return o.pop();}
+      case'remove':{const i=o.findIndex(x=>pyEq(x,a[0]));if(i<0)throw new PyError("ValueError : "+pyRepr(a[0])+" n'est pas dans la liste",no);o.splice(i,1);return null;}
+      case'sort':o.sort((x,y)=>typeof x==='number'&&typeof y==='number'?x-y:(String(x)<String(y)?-1:1));return null;
+      case'reverse':o.reverse();return null;
+      case'count':return o.filter(x=>pyEq(x,a[0])).length;
+      case'index':{const i=o.findIndex(x=>pyEq(x,a[0]));if(i<0)throw new PyError("ValueError : "+pyRepr(a[0])+" n'est pas dans la liste",no);return i;}
+      case'insert':o.splice(a[0],0,a[1]);return null;}}
+  if(o instanceof Map){
+    switch(name){
+      case'get':return o.has(a[0])?o.get(a[0]):(a.length>1?a[1]:null);
+      case'keys':return[...o.keys()];case'values':return[...o.values()];
+      case'items':return[...o].map(([k,v])=>[k,v]);
+      case'pop':{if(!o.has(a[0]))throw new PyError("KeyError : "+pyRepr(a[0]),no);const v=o.get(a[0]);o.delete(a[0]);return v;}}}
+  throw new PyError("AttributeError : méthode « "+name+" » inconnue",no);};
+Interp.prototype.fstring=function(tpl,env,no){
+  let out='',i=0;
+  while(i<tpl.length){
+    const c=tpl[i];
+    if(c==='{'){
+      if(tpl[i+1]==='{'){out+='{';i+=2;continue;}
+      const j=tpl.indexOf('}',i);
+      if(j<0)throw new PyError("SyntaxError : accolade } manquante dans la f-string",no);
+      out+=pyStr(this.ev(parseExprStr(tpl.slice(i+1,j),no),env,no));
+      i=j+1;continue;}
+    if(c==='}'&&tpl[i+1]==='}'){out+='}';i+=2;continue;}
+    out+=c;i++;}
+  return out;};
+
+function installBuiltins(g,out,interp){
+  const B=(name,fn)=>g.set(name,{pyType:'builtin',name,fn});
+  B('print',(a)=>{if(out.length>500)throw new PyError("Trop de lignes affichées (plus de 500) — ta boucle imprime trop !",0);out.push(a.map(pyStr).join(' '));return null;});
+  B('len',(a,no)=>{const v=a[0];
+    if(typeof v==='string')return v.length;if(Array.isArray(v))return v.length;if(v instanceof Map)return v.size;
+    throw new PyError("TypeError : len() ne marche pas sur un "+typeName(v),no);});
+  B('range',(a,no)=>{
+    let s=0,e2=0,st=1;
+    if(a.length===1)e2=a[0];else if(a.length===2){s=a[0];e2=a[1];}else if(a.length===3){s=a[0];e2=a[1];st=a[2];}
+    else throw new PyError("TypeError : range() prend 1 à 3 arguments",no);
+    if(st===0)throw new PyError("ValueError : le pas de range() ne peut pas être 0",no);
+    const r=[];if(st>0)for(let i=s;i<e2;i+=st){r.push(i);if(r.length>100000)throw new PyError("range trop grand !",no);}
+    else for(let i=s;i>e2;i+=st){r.push(i);if(r.length>100000)throw new PyError("range trop grand !",no);}
+    return r;});
+  B('str',a=>pyStr(a.length?a[0]:''));
+  B('int',(a,no)=>{const v=a[0];
+    if(typeof v==='number')return Math.trunc(v);
+    if(typeof v==='string'){const n=parseInt(v.trim(),10);if(isNaN(n))throw new PyError("ValueError : impossible de convertir '"+v+"' en int",no);return n;}
+    if(typeof v==='boolean')return v?1:0;
+    throw new PyError("TypeError : int() impossible sur "+typeName(v),no);});
+  B('float',(a,no)=>{const v=a[0];
+    if(typeof v==='number')return v;
+    if(typeof v==='string'){const n=parseFloat(v.trim());if(isNaN(n))throw new PyError("ValueError : impossible de convertir '"+v+"' en float",no);return n;}
+    throw new PyError("TypeError : float() impossible ici",no);});
+  B('abs',a=>Math.abs(a[0]));
+  B('round',a=>{const n=a.length>1?a[1]:0;const f=Math.pow(10,n);const r=Math.round(a[0]*f)/f;return n===0?r:r;});
+  B('max',(a,no)=>{const arr=a.length===1&&Array.isArray(a[0])?a[0]:a;
+    if(!arr.length)throw new PyError("ValueError : max() d'une séquence vide",no);
+    return arr.reduce((m,x)=>x>m?x:m);});
+  B('min',(a,no)=>{const arr=a.length===1&&Array.isArray(a[0])?a[0]:a;
+    if(!arr.length)throw new PyError("ValueError : min() d'une séquence vide",no);
+    return arr.reduce((m,x)=>x<m?x:m);});
+  B('sum',(a,no)=>{if(!Array.isArray(a[0]))throw new PyError("TypeError : sum() attend une liste",no);return a[0].reduce((s,x)=>s+x,0);});
+  B('sorted',a=>{const c=typeof a[0]==='string'?a[0].split(''):a[0].slice();c.sort((x,y)=>typeof x==='number'&&typeof y==='number'?x-y:(String(x)<String(y)?-1:1));return c;});
+  B('list',(a,no)=>{const v=a.length?a[0]:[];
+    if(Array.isArray(v))return v.slice();if(typeof v==='string')return v.split('');if(v instanceof Map)return[...v.keys()];
+    throw new PyError("TypeError : list() impossible sur "+typeName(v),no);});
+  B('type',a=>"<class '"+typeName(a[0])+"'>");
+  B('input',(a,no)=>{throw new PyError("input() n'est pas disponible dans PyQuest — utilise directement des variables !",no);});
+}
+
+function cloneVal(v){
+  if(Array.isArray(v))return v.map(cloneVal);
+  if(v&&v.__dict__){const m=new Map();for(const k in v.__dict__)m.set(k,cloneVal(v.__dict__[k]));return m;}
+  return v;}
+function runPython(code,pre){
+  const out=[];const interp=new Interp(out);
+  const g=new Env(null);installBuiltins(g,out,interp);
+  const env=new Env(g);
+  if(pre)for(const k in pre)env.set(k,cloneVal(pre[k]));
+  const prog=parseProgram(code);
+  try{interp.execBlock(prog,env);}
+  catch(e){
+    if(e&&'ret'in e)throw new PyError("SyntaxError : « return » en dehors d'une fonction",0);
+    if(e&&(e.brk||e.cont))throw new PyError("SyntaxError : « break/continue » en dehors d'une boucle",0);
+    throw e;}
+  return{out,env,
+    call(name,args){
+      let f;try{f=env.get(name,0);}catch(_){throw new PyError("Ta fonction « "+name+" » n'existe pas — as-tu bien écrit  def "+name+"(...):  ?",0);}
+      if(!f||f.pyType!=='function')throw new PyError("« "+name+" » n'est pas une fonction",0);
+      return interp.callFn(f,args,0);}};
+}
+function fmtErr(e){
+  if(e instanceof PyError)return(e.line?'Ligne '+e.line+' · ':'')+e.msg;
+  return'Erreur interne du jeu : '+(e&&e.message?e.message:String(e));}
+
+
+/* ================================================================
+   ASSEMBLAGE DU CONTENU — base + extensions hebdomadaires
+   ================================================================ */
+const ACTES=window.PYQUEST_BASE.actes.slice();
+const CHAPTERS=window.PYQUEST_BASE.chapters.slice();
+(window.PYQUEST_EXTENSIONS||[]).forEach(ext=>{
+  if(ext.dispo&&new Date(ext.dispo+'T00:00:00')>new Date())return; /* pas encore débloqué */
+  const ai=ACTES.length;
+  ACTES.push({name:ext.name,sub:ext.sub||'',dmg:ext.dmg||24,xp:ext.xp||25,tick:ext.tick||10});
+  ext.chapters.forEach(ch=>{ch.acte=ai;CHAPTERS.push(ch);});
+});
+
+
+/* ================================================================
+   VALIDATION DES DÉFIS
+   ================================================================ */
+function checkChallenge(code,ch){
+  /* --- défi PRÉDICTION : deviner la sortie du code affiché --- */
+  if(ch.type==='predict'){
+    if(!code.trim())return{ok:false,msg:'Écris ta prédiction : recopie EXACTEMENT ce que le programme affichera, une ligne par ligne.',out:[]};
+    let want;
+    try{want=runPython(ch.show,null).out;}
+    catch(e){return{ok:false,msg:'Erreur interne du défi : '+fmtErr(e),out:[]};}
+    const lines=code.replace(/\s+$/,'').split('\n').map(l=>l.replace(/\s+$/,''));
+    if(lines.length!==want.length)
+      return{ok:false,msg:'✘ Le programme affiche '+want.length+' ligne(s), ta prédiction en contient '+lines.length+'. Rejoue le code dans ta tête, print par print.',out:[]};
+    for(let i=0;i<want.length;i++)if(lines[i]!==want[i])
+      return{ok:false,msg:'✘ La ligne '+(i+1)+' de ta prédiction est fausse. Attention au format exact : crochets, apostrophes, espaces… (les listes s’affichent comme [\'a\', \'b\'])',out:[]};
+    return{ok:true,out:['🔮 Prédiction parfaite — tu lis le Python couramment !']};}
+  /* --- défis code / debug --- */
+  if(!code.trim())return{ok:false,msg:'Ton grimoire est vide — écris du code d’abord !',out:[]};
+  if(ch.forbid)for(const f of ch.forbid)if(code.includes(f))
+    return{ok:false,msg:'⛔ « '+f+' » est interdit dans ce défi — le but est de le coder à la main, comme en entretien !',out:[]};
+  let firstOut=null;
+  const hiddenFail=ti=>({ok:false,msg:'🎭 Test caché n°'+(ti+1)+' échoué ! Ton code marche peut-être sur les exemples visibles, mais pas sur TOUS les cas. Pense aux cas limites : vide, un seul élément, zéro, valeurs égales, négatifs…',out:firstOut||[]});
+  for(let ti=0;ti<ch.tests.length;ti++){
+    const t=ch.tests[ti];let r;
+    try{r=runPython(code,t.pre);}
+    catch(e){return t.hidden?hiddenFail(ti):{ok:false,msg:fmtErr(e),out:[]};}
+    if(firstOut===null&&!t.hidden)firstOut=r.out;
+    const ctx=t.pre?' (avec '+Object.keys(t.pre).map(k=>k+' = '+pyStr(cloneVal(t.pre[k]))).join(', ')+')':'';
+    if(t.out){
+      const got=r.out,want=t.out;
+      if(got.length!==want.length||!want.every((w,i)=>w===got[i])){
+        if(t.hidden)return hiddenFail(ti);
+        let msg='Presque !'+ctx+'\nAttendu :\n'+want.map(l=>'  '+l).join('\n')+'\nObtenu :\n'+(got.length?got.map(l=>'  '+l).join('\n'):'  (rien)');
+        return{ok:false,msg,out:firstOut};}}
+    if(t.vars){
+      for(const k in t.vars){
+        let v;try{v=r.env.get(k,0);}catch(_){return t.hidden?hiddenFail(ti):{ok:false,msg:'La variable « '+k+' » n’existe pas — crée-la avec  '+k+' = ...',out:firstOut};}
+        if(!pyEq(v,cloneVal(t.vars[k])))return t.hidden?hiddenFail(ti):{ok:false,msg:'La variable '+k+' vaut '+pyRepr(v)+', attendu '+pyRepr(cloneVal(t.vars[k])),out:firstOut};}}
+    if(t.call){
+      let v;
+      try{v=r.call(t.call.fn,t.call.args.map(cloneVal));}
+      catch(e){return t.hidden?hiddenFail(ti):{ok:false,msg:fmtErr(e),out:firstOut};}
+      const want=cloneVal(t.call.want);
+      if(!pyEq(v,want)){
+        if(t.hidden)return hiddenFail(ti);
+        const callStr=t.call.fn+'('+t.call.args.map(a=>pyRepr(cloneVal(a))).join(', ')+')';
+        return{ok:false,msg:callStr+' a renvoyé '+pyRepr(v)+' — attendu '+pyRepr(want)+(v===null?'\n(ta fonction ne renvoie rien : as-tu utilisé return ?)':''),out:firstOut};}}
+    if(t.callRaises){
+      let threw=false,badMsg=null;
+      try{r.call(t.callRaises.fn,t.callRaises.args.map(cloneVal));}
+      catch(e){threw=true;
+        const m=fmtErr(e);
+        if(t.callRaises.match&&!new RegExp(t.callRaises.match).test(m))badMsg=m;}
+      if(!threw)return t.hidden?hiddenFail(ti):{ok:false,msg:t.callRaises.fn+'('+t.callRaises.args.map(pyRepr).join(', ')+') aurait dû lever une erreur avec raise, mais n’en a levé aucune.',out:firstOut};
+      if(badMsg)return t.hidden?hiddenFail(ti):{ok:false,msg:'Une erreur a bien été levée, mais pas la bonne : '+badMsg,out:firstOut};}
+  }
+  return{ok:true,out:firstOut||[]};
+}
+
+/* ================================================================
+   AUDIO (mini-synthé WebAudio)
+   ================================================================ */
+let AC=null,muted=false;
+function beep(freq,dur,type,when,vol){
+  if(muted)return;
+  try{
+    AC=AC||new(window.AudioContext||window.webkitAudioContext)();
+    const o=AC.createOscillator(),g=AC.createGain();
+    o.type=type||'square';o.frequency.value=freq;
+    g.gain.setValueAtTime(vol||.08,AC.currentTime+(when||0));
+    g.gain.exponentialRampToValueAtTime(.0001,AC.currentTime+(when||0)+dur);
+    o.connect(g).connect(AC.destination);
+    o.start(AC.currentTime+(when||0));o.stop(AC.currentTime+(when||0)+dur+.05);
+  }catch(_){}}
+const sfx={
+  hit(){beep(392,.12,'square',0);beep(523,.14,'square',.08);beep(784,.2,'square',.16);},
+  hurt(){beep(140,.25,'sawtooth',0,.1);beep(90,.3,'sawtooth',.08,.1);},
+  win(){[523,659,784,1046].forEach((f,i)=>beep(f,.22,'triangle',i*.13,.1));},
+  click(){beep(660,.05,'sine',0,.05);}};
+
+/* ================================================================
+   PARTICULES
+   ================================================================ */
+const fxc=document.getElementById('fx'),fctx=fxc.getContext('2d');
+let parts=[],fxOn=false;
+function sizeFx(){fxc.width=innerWidth;fxc.height=innerHeight;}
+sizeFx();addEventListener('resize',sizeFx);
+function burst(x,y,color,n){
+  for(let i=0;i<(n||36);i++){
+    const a=Math.random()*Math.PI*2,s=2+Math.random()*7;
+    parts.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-2,life:1,r:2+Math.random()*4,c:color});}
+  if(!fxOn){fxOn=true;requestAnimationFrame(fxLoop);}}
+function fxLoop(){
+  fctx.clearRect(0,0,fxc.width,fxc.height);
+  parts=parts.filter(p=>p.life>0);
+  for(const p of parts){
+    p.x+=p.vx;p.y+=p.vy;p.vy+=.25;p.life-=.025;
+    fctx.globalAlpha=Math.max(0,p.life);fctx.fillStyle=p.c;
+    fctx.beginPath();fctx.arc(p.x,p.y,p.r*p.life,0,7);fctx.fill();}
+  fctx.globalAlpha=1;
+  if(parts.length){requestAnimationFrame(fxLoop);}else fxOn=false;}
+function floater(x,y,txt,color){
+  const d=document.createElement('div');d.className='floater';d.textContent=txt;
+  d.style.left=x+'px';d.style.top=y+'px';d.style.color=color;
+  document.body.appendChild(d);setTimeout(()=>d.remove(),1000);}
+
+/* ================================================================
+   JEU
+   ================================================================ */
+const $=id=>document.getElementById(id);
+function maxXP(){let t=0;for(const ch of CHAPTERS){const a=ACTES[ch.acte];t+=a.xp*3+a.xp*2;}return t;}
+/* les rangs suivent la taille du jeu : de nouveaux actes = des rangs plus durs à atteindre */
+const RANKS=[[0,'Nul en Python 🐣'],[.078,'Apprenti·e Mage 🌱'],[.196,'Codeur·se ⚗️'],[.337,'Mage du Code 🔮'],[.533,'Archimage 🌟'],[.722,'Grand Sage 📜'],[.941,'EXPERT LÉGENDAIRE 🏆']].map(([f,n])=>[Math.round(f*maxXP()),n]);
+let save={done:{},best:{}};
+let SAVE_KEY='pyquest'; /* 'pyquest' = invité ; 'pyquest-<uid>' = par compte */
+function loadLocal(){try{const s=localStorage.getItem(SAVE_KEY);save=s?JSON.parse(s):{done:{},best:{}};}catch(_){save={done:{},best:{}};}}
+loadLocal();
+function persist(){
+  try{localStorage.setItem(SAVE_KEY,JSON.stringify(save));}catch(_){}
+  cloudSync();}
+function totalXP(){let x=0;for(const k in save.best)x+=save.best[k];return x;}
+function rankName(){const x=totalXP();let r=RANKS[0][1];for(const[t,n]of RANKS)if(x>=t)r=n;return r;}
+function chapterDone(ci){return!!save.done[ci+'-boss'];}
+function dallesDone(ci){return CHAPTERS[ci].challenges.every((_,i)=>save.done[ci+'-'+i]);}
+function chapterUnlocked(ci){return ci===0||chapterDone(ci-1);}
+function dalleUnlocked(ci,di){return chapterUnlocked(ci)&&(di===0||!!save.done[ci+'-'+(di-1)]);}
+function bossUnlocked(ci){return chapterUnlocked(ci)&&dallesDone(ci);}
+function refreshHud(){
+  const r=rankName(),x=totalXP()+' XP';
+  $('rank1').textContent=r;$('xp1').textContent=x;
+  $('rank2').textContent=r;$('xp2').textContent=x;}
+
+/* ================================================================
+   COMPTES & SAUVEGARDE EN LIGNE (Supabase) + CLASSEMENT
+   ================================================================ */
+const CFG=window.PYQUEST_CONFIG||{};
+const sb=(window.supabase&&CFG.SUPABASE_URL&&CFG.SUPABASE_ANON_KEY)
+  ?window.supabase.createClient(CFG.SUPABASE_URL,CFG.SUPABASE_ANON_KEY):null;
+let user=null,pseudo=null,syncT=null,pendingPseudo='';
+function cloudSync(){
+  if(!sb||!user)return;
+  clearTimeout(syncT);
+  syncT=setTimeout(async()=>{
+    try{await sb.from('profils').upsert({id:user.id,pseudo:pseudo||'Héros',xp:totalXP(),data:save,updated_at:new Date().toISOString()});}catch(_){}
+  },1500);}
+async function initCloud(u){
+  user=u;SAVE_KEY='pyquest-'+u.id;
+  let row=null;
+  try{const r=await sb.from('profils').select('pseudo,xp,data').eq('id',u.id).maybeSingle();row=r.data;}catch(_){}
+  if(row){pseudo=row.pseudo;save=Object.assign({done:{},best:{}},row.data||{});}
+  else{
+    pseudo=pendingPseudo||(u.email||'Héros').split('@')[0];
+    loadLocal(); /* première connexion sur cet appareil : on repart de la progression locale du compte (vide sinon) */
+    try{await sb.from('profils').insert({id:u.id,pseudo,xp:totalXP(),data:save});}catch(_){}}
+  try{localStorage.setItem(SAVE_KEY,JSON.stringify(save));}catch(_){}
+  renderHudUser();refreshHud();}
+function renderHudUser(){
+  $('hud-user').textContent=user?('· 👤 '+(pseudo||'')):'';
+  $('btn-logout').style.display=user?'':'none';}
+async function doAuth(mode){
+  const email=$('l-email').value.trim(),pass=$('l-pass').value;
+  pendingPseudo=$('l-pseudo').value.trim();
+  const msg=$('l-msg');
+  if(!email||!pass){msg.textContent='Il faut un email et un mot de passe.';return;}
+  if(mode==='signup'&&!pendingPseudo){msg.textContent='Choisis un pseudo pour le classement !';return;}
+  msg.textContent='⏳ Un instant…';
+  try{
+    const r=mode==='signup'
+      ?await sb.auth.signUp({email,password:pass})
+      :await sb.auth.signInWithPassword({email,password:pass});
+    if(r.error){msg.textContent='❌ '+r.error.message;return;}
+    if(!r.data.session){msg.textContent='📬 Compte créé ! Va confirmer ton email, puis reviens te connecter.';return;}
+    await initCloud(r.data.session.user);
+    msg.textContent='';
+    show('screen-title');
+  }catch(_){msg.textContent='❌ Erreur réseau — réessaie.';}}
+async function bootAuth(){
+  if(!sb)return; /* pas de config Supabase : mode invité, sauvegarde locale */
+  try{
+    const {data}=await sb.auth.getSession();
+    if(data&&data.session)await initCloud(data.session.user);
+    else show('screen-login');
+  }catch(_){}}
+async function showBoard(){
+  const v=$('vcard');
+  let rows=[];
+  if(sb){try{const r=await sb.from('profils').select('pseudo,xp').order('xp',{ascending:false}).limit(20);rows=r.data||[];}catch(_){}}
+  v.innerHTML='<div class="spr">🏆</div><h2>Classement</h2>'+
+    (rows.length
+      ?'<div class="next-steps">'+rows.map((r,i)=>(i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1)+'.')+' <b>'+esc(String(r.pseudo||'?'))+'</b> — '+(r.xp||0)+' XP').join('<br>')+'</div>'
+      :'<p>'+(sb?'Personne au classement pour l’instant — sois le premier !':'Le classement nécessite le mode en ligne (crée un compte).')+'</p>')+
+    '<button class="btn-big" id="btn-vclose">Fermer</button>';
+  $('overlay').classList.add('show');
+  $('btn-vclose').onclick=()=>{$('overlay').classList.remove('show');};}
+
+/* étoiles de fond */
+(function(){const s=$('stars');for(let i=0;i<70;i++){const e=document.createElement('span');
+  e.style.left=Math.random()*100+'%';e.style.top=Math.random()*100+'%';
+  e.style.animationDelay=(Math.random()*4)+'s';e.style.opacity=.2+Math.random()*.5;s.appendChild(e);}})();
+
+function show(id){
+  if(id!=='screen-map')try{stopWorld();}catch(_){}
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));$(id).classList.add('active');}
+
+/* ================================================================
+   HÉROS JOUABLES — 5 classes, 5 styles
+   ================================================================ */
+const CLASSES=[
+ {id:'guerrier',emoji:'🤺',name:'Guerrier',color:'#E8B04B',tag:'Fonce dans le tas, encaisse tout.',
+  perk:'🛡 Peau d’acier : les dégâts que tu subis sont réduits de 25 %.',dmgMult:.75,stats:[5,5,2,1]},
+ {id:'rogue',emoji:'🥷',name:'Rogue',color:'#8A7BFF',tag:'Rapide, insaisissable, mortel.',
+  perk:'🕶 Furtivité : les boss chrono attaquent 50 % plus lentement, et tu cours plus vite sur la carte.',timerMult:1.5,speed:3.7,stats:[3,2,5,2]},
+ {id:'mage',emoji:'🧙',name:'Mage',color:'#4B8BBE',tag:'Le savoir est la plus grande arme.',
+  perk:'📖 Savoir ancien : le 1er indice de chaque défi est gratuit (ton XP reste entière).',freeHint:true,stats:[2,2,3,5]},
+ {id:'orc',emoji:'👹',name:'Orc',color:'#7EC850',tag:'GRAOU. Plus de risque, plus de gloire.',
+  perk:'🪓 Rage de guerre : +20 % d’XP gagnée… mais +20 % de dégâts subis.',xpMult:1.2,dmgMult:1.2,stats:[5,3,3,1]},
+ {id:'heal',emoji:'🧚',name:'Soigneuse',color:'#7EE787',tag:'La lumière répare tout.',
+  perk:'💚 Grâce : tu récupères 15 PV après chaque défi réussi.',healOnWin:15,stats:[1,3,3,4]}];
+function myClass(){return CLASSES[save.cls==null?2:save.cls];}
+
+function renderSelect(){
+  const g=$('classes');g.innerHTML='';
+  CLASSES.forEach((c,i)=>{
+    const b=document.createElement('button');
+    b.className='ccard'+(save.cls===i?' sel':'');
+    b.style.setProperty('--cc',c.color);
+    b.innerHTML='<span class="csprite idle-'+c.id+'">'+c.emoji+'</span><h3>'+c.name+'</h3><p class="ctag">'+c.tag+'</p>'+
+      '<div class="cstats">'+['Force','Défense','Vitesse','Magie'].map((l,j)=>'<div><span>'+l+'</span><i style="width:'+(c.stats[j]*18)+'%"></i></div>').join('')+'</div>'+
+      '<p class="cperk">'+c.perk+'</p>'+
+      '<span class="cbtn">'+(save.cls===i?'✔ Choisi':'Choisir')+'</span>';
+    b.onclick=()=>{save.cls=i;persist();sfx.win();renderSelect();
+      setTimeout(()=>{show('screen-map');renderMap();},400);};
+    g.appendChild(b);});}
+
+/* ================================================================
+   MONDE 2D — carte explorable, caméra, collisions, portes
+   ================================================================ */
+const TILE=32,WCOLS=44,WW=TILE*WCOLS,VIEW_W=960,VIEW_H=560;
+const BASE_NODES=[[4,4],[9,6],[14,3],[19,6],[24,3],[29,6],[34,4],[39,6],
+             [38,14],[30,16],[22,13],[14,16],[6,14],
+             [6,24],[14,26],[22,23],[30,26],[38,24]];
+const BASE_GATES=[{c:41,r:10,next:8},{c:3,r:20,next:13}];
+let WROWS=30,WH=TILE*WROWS,NODES=[],GATES=[],WALLS=[10,20];
+/* la carte s'agrandit d'une bande de 10 lignes par acte d'extension :
+   les nouveaux monstres sont placés en serpentin, derrière une porte ⛩️ */
+function layoutWorld(){
+  NODES=BASE_NODES.map(n=>n.slice());
+  GATES=BASE_GATES.map(g=>({c:g.c,r:g.r,next:g.next}));
+  WALLS=[10,20];
+  const extActes=[];
+  for(let i=BASE_NODES.length;i<CHAPTERS.length;i++){
+    const a=CHAPTERS[i].acte;
+    if(!extActes.length||extActes[extActes.length-1].acte!==a)extActes.push({acte:a,count:0,first:i});
+    extActes[extActes.length-1].count++;}
+  extActes.forEach((ea,k)=>{
+    const wall=30+10*k;
+    WALLS.push(wall);
+    const prev=NODES[NODES.length-1];
+    GATES.push({c:prev[0],r:wall,next:ea.first});
+    const dir=prev[0]>22?-1:1;
+    const x0=dir>0?6:38;
+    const step=ea.count>1?Math.min(10,Math.floor(32/(ea.count-1))):0;
+    for(let j=0;j<ea.count;j++)
+      NODES.push([Math.max(2,Math.min(WCOLS-3,x0+dir*j*step)),wall+(j%2?7:4)]);});
+  WROWS=30+10*extActes.length;
+  WH=TILE*WROWS;}
+const sr=i=>{const x=Math.sin(i*127.1+13.7)*43758.5453;return x-Math.floor(x);};
+const bandOf=r=>Math.floor(r/10)%3;
+let blocked=null,pathSet=null,decor=[],terrain=null,pathList=null,DALLES=null;
+function buildWorld(){
+  layoutWorld();
+  blocked=Array.from({length:WROWS},()=>new Array(WCOLS).fill(false));
+  pathSet=new Set();pathList=[];
+  const mark=(c,r)=>{if(c>=0&&c<WCOLS&&r>=0&&r<WROWS){const k=c+','+r;if(!pathSet.has(k)){pathSet.add(k);pathList.push([c,r]);}}};
+  const seg=(c1,r1,c2,r2)=>{let c=c1,r=r1;mark(c,r);while(c!==c2){c+=c2>c?1:-1;mark(c,r);}while(r!==r2){r+=r2>r?1:-1;mark(c,r);}};
+  seg(2,3,2,7);seg(2,7,NODES[0][0],NODES[0][1]); /* chemin d'intro allongé : 3 dalles y tiennent */
+  for(let i=0;i<BASE_NODES.length-1;i++){
+    const a=NODES[i],b=NODES[i+1];
+    if(i===7){seg(a[0],a[1],41,a[1]);seg(41,a[1],41,14);seg(41,14,b[0],b[1]);}
+    else if(i===12){seg(a[0],a[1],3,a[1]);seg(3,a[1],3,24);seg(3,24,b[0],b[1]);}
+    else seg(a[0],a[1],b[0],b[1]);}
+  /* chemin des actes d'extension : on descend au niveau de la porte, puis on serpente */
+  for(let i=BASE_NODES.length;i<NODES.length;i++){
+    const a=NODES[i-1],b=NODES[i];
+    if(CHAPTERS[i].acte!==CHAPTERS[i-1].acte){
+      seg(a[0],a[1],a[0],b[1]); /* descente verticale à travers la porte ⛩️ */
+      seg(a[0],b[1],b[0],b[1]);}
+    else seg(a[0],a[1],b[0],b[1]);}
+  /* --- placement des dalles-défis : 3 par chapitre, réparties sur le
+     tronçon de chemin qui mène au monstre du chapitre --- */
+  const idxOf=(c,r)=>{for(let i=0;i<pathList.length;i++)if(pathList[i][0]===c&&pathList[i][1]===r)return i;return-1;};
+  DALLES=[];
+  let prev=0;
+  for(let ci=0;ci<NODES.length;ci++){
+    const ni=idxOf(NODES[ci][0],NODES[ci][1]);
+    const arr=[];
+    for(let k=1;k<=3;k++){
+      let j=Math.min(prev+Math.round((ni-prev)*k/4),ni-1);
+      let guard=0;
+      while(guard++<30){
+        const c=pathList[j][0],r=pathList[j][1];
+        const bad=WALLS.includes(r)||GATES.some(g=>g.c===c&&g.r===r)||NODES.some(n=>n[0]===c&&n[1]===r)||arr.some(d=>d.c===c&&d.r===r)||j<=prev;
+        if(!bad)break;
+        j--;if(j<=prev)j=prev+1;}
+      arr.push({c:pathList[j][0],r:pathList[j][1]});}
+    DALLES.push(arr);prev=ni;}
+  for(let c=0;c<WCOLS;c++){blocked[0][c]=true;blocked[WROWS-1][c]=true;}
+  for(let r=0;r<WROWS;r++){blocked[r][0]=true;blocked[r][WCOLS-1]=true;}
+  for(const wr of WALLS)for(let c=0;c<WCOLS;c++)blocked[wr][c]=true;
+  decor=[];
+  const D=[['🌲','🌳','🌼','🍄'],['🌵','🪨','🦴','🌾'],['🌋','🗿','🔥','💀']];
+  for(let i=0;i<Math.round(620*WROWS/30);i++){
+    const c=1+Math.floor(sr(i)*(WCOLS-2)),r=1+Math.floor(sr(i+500)*(WROWS-2));
+    if(WALLS.includes(r)||blocked[r][c])continue;
+    let near=false;
+    for(let dc=-1;dc<=1&&!near;dc++)for(let dr=-1;dr<=1&&!near;dr++)if(pathSet.has((c+dc)+','+(r+dr)))near=true;
+    if(near)continue;
+    if(NODES.some(n=>Math.abs(n[0]-c)<3&&Math.abs(n[1]-r)<3))continue;
+    if(GATES.some(g=>Math.abs(g.c-c)<3&&Math.abs(g.r-r)<3))continue;
+    decor.push({c,r,e:D[bandOf(r)][Math.floor(sr(i+900)*4)]});
+    blocked[r][c]=true;}
+  terrain=document.createElement('canvas');terrain.width=WW;terrain.height=WH;
+  const t=terrain.getContext('2d');
+  const base=[['#16301F','#1A3623'],['#332B1C','#3A3122'],['#221420','#281827']];
+  for(let r=0;r<WROWS;r++)for(let c=0;c<WCOLS;c++){
+    const b=bandOf(r);
+    t.fillStyle=base[b][(c+r)%2];
+    if(sr(c*97+r*31)>.88)t.fillStyle=b===0?'#1F3D2A':b===1?'#413726':'#2C1B2B';
+    t.fillRect(c*TILE,r*TILE,TILE,TILE);
+    if(pathSet.has(c+','+r)){
+      t.fillStyle=b===0?'#7E7048':b===1?'#96814F':'#6B5170';
+      t.fillRect(c*TILE+2,r*TILE+2,TILE-4,TILE-4);
+      t.fillStyle='rgba(255,255,255,.05)';t.fillRect(c*TILE+2,r*TILE+2,TILE-4,4);}}
+  for(const wr of WALLS)for(let c=0;c<WCOLS;c++){
+    t.fillStyle='#0A0D18';t.fillRect(c*TILE,wr*TILE,TILE,TILE);
+    t.fillStyle='#3A4360';t.fillRect(c*TILE+1,wr*TILE,TILE-2,7);}}
+
+let P={x:2.5*TILE,y:3.5*TILE,dir:1,moving:false,trail:[]};
+let mapActive=false,worldRAF=0,near=null;
+const keys={up:false,down:false,left:false,right:false};
+const wcv=$('world'),wctx=wcv.getContext('2d');
+function dalleAt(c,r){
+  if(!DALLES)return null;
+  for(let ci=0;ci<DALLES.length;ci++)for(let di=0;di<3;di++){
+    const d=DALLES[ci][di];if(d.c===c&&d.r===r)return{ci,di};}
+  return null;}
+function tileBlocked(c,r){
+  if(c<0||r<0||c>=WCOLS||r>=WROWS)return true;
+  const g=GATES.find(g=>g.c===c&&g.r===r);
+  if(g)return!chapterUnlocked(g.next);
+  if(!pathSet.has(c+','+r))return true; /* on marche de dalle en dalle, uniquement sur le chemin */
+  const d=dalleAt(c,r);
+  if(d&&!save.done[d.ci+'-'+d.di])return true; /* une dalle non résolue barre la route */
+  return blocked[r][c];}
+function canPx(x,y){
+  for(const o of[[-9,-2],[9,-2],[-9,12],[9,12]])
+    if(tileBlocked(Math.floor((x+o[0])/TILE),Math.floor((y+o[1])/TILE)))return false;
+  return true;}
+function step(){
+  const cls=myClass();
+  const sp=cls.speed||3;
+  let dx=(keys.right?1:0)-(keys.left?1:0),dy=(keys.down?1:0)-(keys.up?1:0);
+  P.moving=!!(dx||dy);
+  if(!P.moving)return;
+  if(dx&&dy){dx*=.707;dy*=.707;}
+  if(dx)P.dir=dx>0?1:-1;
+  const nx=P.x+dx*sp,ny=P.y+dy*sp;
+  if(canPx(nx,P.y))P.x=nx;
+  if(canPx(P.x,ny))P.y=ny;
+  P.trail.push([P.x,P.y]);
+  if(P.trail.length>7)P.trail.shift();}
+function drawPlayer(time,camX,camY){
+  const cls=myClass();
+  const x=P.x-camX,y=P.y-camY;
+  wctx.textAlign='center';wctx.textBaseline='middle';
+  wctx.fillStyle='rgba(0,0,0,.35)';wctx.beginPath();wctx.ellipse(x,y+16,11,4,0,0,7);wctx.fill();
+  if(cls.id==='rogue'&&P.moving){
+    wctx.globalAlpha=.16;wctx.font='28px serif';
+    for(let i=0;i<P.trail.length;i+=2)wctx.fillText(cls.emoji,P.trail[i][0]-camX,P.trail[i][1]-camY);
+    wctx.globalAlpha=1;}
+  if(cls.id==='heal'){
+    wctx.fillStyle='rgba(126,231,135,'+(0.10+0.08*Math.sin(time*4))+')';
+    wctx.beginPath();wctx.arc(x,y+10,20,0,7);wctx.fill();}
+  if(cls.id==='mage'){
+    wctx.fillStyle='rgba(130,190,255,.55)';
+    for(let i=0;i<3;i++){const a=time*2.2+i*2.1;
+      wctx.beginPath();wctx.arc(x+Math.cos(a)*17,y+Math.sin(a*1.4)*11,1.8,0,7);wctx.fill();}}
+  if(cls.id==='orc'&&P.moving&&Math.floor(time*9)%2===0){
+    wctx.fillStyle='rgba(190,180,160,.28)';
+    wctx.beginPath();wctx.arc(x-P.dir*11,y+13,4,0,7);wctx.fill();}
+  let bob;
+  if(cls.id==='mage'||cls.id==='heal')bob=Math.sin(time*3)*4-(P.moving?3:0);
+  else bob=Math.sin(time*(P.moving?11:2.4))*(P.moving?(cls.id==='orc'?4.5:3):1.2);
+  wctx.save();wctx.translate(x,y+bob);
+  if(P.dir<0)wctx.scale(-1,1);
+  if(cls.id==='orc'&&P.moving){const s=1+Math.sin(time*11)*.08;wctx.scale(s,2-s);}
+  wctx.font='30px serif';wctx.fillText(cls.emoji,0,0);
+  wctx.restore();}
+function updatePrompt(){
+  const pr=$('prompt');
+  let best=null,bd=1e12;
+  NODES.forEach((n,i)=>{
+    const dx=n[0]*TILE+16-P.x,dy=n[1]*TILE+16-P.y,d=dx*dx+dy*dy;
+    if(d<bd){bd=d;best={kind:'boss',ci:i};}});
+  if(DALLES)DALLES.forEach((arr,ci)=>arr.forEach((t,di)=>{
+    const dx=t.c*TILE+16-P.x,dy=t.r*TILE+16-P.y,d=dx*dx+dy*dy;
+    if(d<bd){bd=d;best={kind:'dalle',ci,di};}}));
+  if(bd<56*56&&best){
+    const ch=CHAPTERS[best.ci];
+    if(best.kind==='dalle'){
+      const d=ch.challenges[best.di];
+      const done=!!save.done[best.ci+'-'+best.di],unlocked=dalleUnlocked(best.ci,best.di);
+      near=unlocked?best:null;
+      pr.innerHTML=unlocked
+        ?'<b>[E]</b> '+(done?'⭐ Refaire la dalle':'💠 Dalle '+(best.di+1)+'/3')+' : '+d.title+'<span>'+ch.jour+' · '+ch.mini+'</span>'
+        :'🔒 Dalle scellée — '+(chapterUnlocked(best.ci)?'franchis d’abord la dalle précédente':'bats d’abord le monstre du chapitre précédent');
+      pr.className='prompt show'+(unlocked?' click':'');
+    }else{
+      const done=chapterDone(best.ci),unlocked=bossUnlocked(best.ci);
+      near=unlocked?best:null;
+      pr.innerHTML=unlocked
+        ?'<b>[E]</b> '+(done?'⭐ Refaire le projet':'🏗️ GRAND PROJET')+' : '+ch.name+'<span>'+ch.jour+' · '+ch.mini+'</span>'
+        :'🔒 '+ch.name+' — franchis d’abord ses 3 dalles 💠';
+      pr.className='prompt show'+(unlocked?' click':'');
+    }
+  }else{near=null;pr.className='prompt';}}
+function interact(){
+  if(!near)return;
+  sfx.click();
+  if(near.kind==='dalle')startDalle(near.ci,near.di);
+  else startBoss(near.ci);}
+function worldLoop(ts){
+  if(!mapActive)return;
+  step();
+  const camX=Math.max(0,Math.min(P.x-VIEW_W/2,WW-VIEW_W));
+  const camY=Math.max(0,Math.min(P.y-VIEW_H/2,WH-VIEW_H));
+  wctx.drawImage(terrain,camX,camY,VIEW_W,VIEW_H,0,0,VIEW_W,VIEW_H);
+  const time=ts/1000;
+  wctx.textAlign='center';wctx.textBaseline='middle';
+  wctx.font='24px serif';
+  for(const g of GATES)wctx.fillText(chapterUnlocked(g.next)?'⛩️':'🚧',g.c*TILE+16-camX,g.r*TILE+16-camY);
+  for(const d of decor){
+    const x=d.c*TILE+16-camX,y=d.r*TILE+16-camY;
+    if(x<-40||y<-40||x>VIEW_W+40||y>VIEW_H+40)continue;
+    wctx.fillText(d.e,x,y);}
+  /* --- dalles-défis : chaque dalle du chemin est un défi --- */
+  for(let ci=0;ci<DALLES.length;ci++)for(let di=0;di<3;di++){
+    const dl=DALLES[ci][di];
+    const x=dl.c*TILE-camX,y=dl.r*TILE-camY;
+    if(x<-40||y<-40||x>VIEW_W+40||y>VIEW_H+40)continue;
+    const done=!!save.done[ci+'-'+di],unlocked=dalleUnlocked(ci,di);
+    if(done){wctx.fillStyle='rgba(126,231,135,.30)';wctx.strokeStyle='rgba(126,231,135,.85)';}
+    else if(unlocked){const pu=.55+.35*Math.sin(time*4+di);wctx.fillStyle='rgba(255,212,59,'+(pu*.32)+')';wctx.strokeStyle='rgba(255,212,59,'+pu+')';}
+    else{wctx.fillStyle='rgba(16,22,40,.6)';wctx.strokeStyle='rgba(115,131,168,.65)';}
+    wctx.lineWidth=2;
+    wctx.fillRect(x+3,y+3,TILE-6,TILE-6);
+    wctx.strokeRect(x+3,y+3,TILE-6,TILE-6);
+    wctx.font='13px serif';
+    wctx.fillText(done?'⭐':unlocked?'💠':'🔒',x+16,y+13);
+    wctx.font='bold 8px sans-serif';
+    wctx.fillStyle=done?'#7EE787':unlocked?'#FFD43B':'#7383A8';
+    wctx.fillText((ci+1)+'.'+(di+1),x+16,y+25);}
+  for(let i=0;i<NODES.length;i++){
+    const x=NODES[i][0]*TILE+16-camX,y=NODES[i][1]*TILE+16-camY;
+    if(x<-80||y<-80||x>VIEW_W+80||y>VIEW_H+80)continue;
+    const unlocked=chapterUnlocked(i),done=chapterDone(i),next=bossUnlocked(i)&&!done;
+    if(next){
+      wctx.strokeStyle='rgba(255,212,59,'+(0.45+0.4*Math.sin(time*4))+')';
+      wctx.lineWidth=3;wctx.beginPath();wctx.arc(x,y+2,23,0,7);wctx.stroke();}
+    wctx.globalAlpha=unlocked?1:.35;
+    wctx.font=(i===17?'38px':'30px')+' serif';
+    wctx.fillText(CHAPTERS[i].emoji,x,y+(next?Math.sin(time*3+i)*3:0));
+    wctx.globalAlpha=1;
+    wctx.font='bold 10px sans-serif';
+    wctx.fillStyle=done?'#7EE787':unlocked?'#FFD43B':'#7383A8';
+    wctx.fillText((done?'⭐ ':unlocked?'':'🔒 ')+(i+1)+'. '+CHAPTERS[i].name,x,y+27);}
+  drawPlayer(time,camX,camY);
+  updatePrompt();
+  worldRAF=requestAnimationFrame(worldLoop);}
+function renderMap(){
+  refreshHud();
+  if(!terrain)buildWorld();
+  if(save.px!=null&&save.py!=null&&canPx(save.px,save.py)){P.x=save.px;P.y=save.py;}
+  mapActive=true;
+  cancelAnimationFrame(worldRAF);
+  worldRAF=requestAnimationFrame(worldLoop);}
+function stopWorld(){
+  if(!mapActive)return;
+  mapActive=false;cancelAnimationFrame(worldRAF);
+  save.px=P.x;save.py=P.y;persist();}
+addEventListener('keydown',e=>{
+  if(!mapActive)return;
+  const k=e.key.toLowerCase();
+  const m={arrowup:'up',z:'up',w:'up',arrowdown:'down',s:'down',arrowleft:'left',q:'left',a:'left',arrowright:'right',d:'right'};
+  if(m[k]){keys[m[k]]=true;e.preventDefault();}
+  else if(k==='e'||k==='enter'){interact();e.preventDefault();}});
+addEventListener('keyup',e=>{
+  const k=e.key.toLowerCase();
+  const m={arrowup:'up',z:'up',w:'up',arrowdown:'down',s:'down',arrowleft:'left',q:'left',a:'left',arrowright:'right',d:'right'};
+  if(m[k])keys[m[k]]=false;});
+document.querySelectorAll('#dpad button').forEach(b=>{
+  const k=b.dataset.k;
+  if(k==='int'){b.addEventListener('pointerdown',e=>{e.preventDefault();interact();});return;}
+  const on=e=>{e.preventDefault();keys[k]=true;};
+  const off=()=>{keys[k]=false;};
+  b.addEventListener('pointerdown',on);
+  b.addEventListener('pointerup',off);b.addEventListener('pointerleave',off);b.addEventListener('pointercancel',off);});
+$('prompt').addEventListener('click',interact);
+
+/* ---------- combat ---------- */
+let cur={ci:0,di:0,mode:'dalle',php:100,hintUsed:false,solUsed:false,fails:0};
+let battleTimer=null;
+function stopTimer(){if(battleTimer){clearInterval(battleTimer);battleTimer=null;}}
+function curChallenge(){const ch=CHAPTERS[cur.ci];return cur.mode==='boss'?ch.projet:ch.challenges[cur.di];}
+function curKey(){return cur.mode==='boss'?cur.ci+'-boss':cur.ci+'-'+cur.di;}
+function startDalle(ci,di){
+  cur={ci,di,mode:'dalle',php:100,hintUsed:false,solUsed:false,fails:0};
+  show('screen-battle');
+  renderBattle(true);}
+function startBoss(ci){
+  cur={ci,di:0,mode:'boss',php:100,hintUsed:false,solUsed:false,fails:0};
+  show('screen-battle');
+  renderBattle(true);}
+function renderBattle(resetCode){
+  refreshHud();stopTimer();
+  const ch=CHAPTERS[cur.ci],d=curChallenge(),acte=ACTES[ch.acte],cls=myClass();
+  const boss=cur.mode==='boss';
+  $('player-sprite').textContent=cls.emoji;
+  $('player-name').textContent='Toi, '+cls.name+(cls.id==='heal'?'':'')+' du Code';
+  $('ch-eyebrow').textContent=acte.name+' · '+ch.jour+' · '+ch.mini;
+  $('ch-title').textContent=d.title;
+  $('lesson').innerHTML=d.lesson;
+  let taskHtml='';
+  if(boss)taskHtml+='<div class="badge b-hidden">🏗️ Grand Projet — le monstre garde un projet complet</div>';
+  if(d.type==='debug')taskHtml+='<div class="badge b-debug">🐛 Défi Debug — répare le code cassé</div>';
+  if(d.type==='predict')taskHtml+='<div class="badge b-predict">🔮 Prédiction — devine la sortie sans exécuter</div>';
+  if(d.tests&&d.tests.some(t=>t.hidden))taskHtml+='<div class="badge b-hidden">🎭 Tests cachés — ton code est jugé sur des cas invisibles</div>';
+  if(ch.timed)taskHtml+='<div class="badge b-timed">⏱ Boss chrono — il attaque toutes les '+ch.timed+' s</div>';
+  taskHtml+=d.task;
+  if(d.type==='predict')taskHtml+='<pre class="showcode">'+esc(d.show)+'</pre>';
+  $('task').innerHTML=taskHtml;
+  $('prog').textContent=(boss?'GRAND PROJET · échec = -'+acte.dmg+' PV · réussite = +'+(acte.xp*2)+' XP'
+    :'Dalle '+(cur.di+1)+'/3 · échec = -'+acte.dmg+' PV · réussite = +'+acte.xp+' XP');
+  $('enemy-name').textContent=boss?ch.name:'Dalle '+(cur.di+1)+'/3 · '+ch.name;
+  const es=$('enemy-sprite');es.textContent=boss?ch.emoji:'💠';es.className='sprite';
+  const pips=$('pips');pips.innerHTML='';
+  {const p=document.createElement('div');p.className='pip';pips.appendChild(p);}
+  $('php').style.width=cur.php+'%';$('phptxt').textContent='PV '+cur.php+' / 100';
+  $('hintbox').className='hintbox';$('hintbox').dataset.n='0';
+  if(resetCode){$('code').value=d.starter||'';highlight();}
+  $('code').placeholder=d.type==='predict'?'Écris ici la sortie exacte du programme, une ligne par ligne…':'';
+  setConsole('<span class="dim">La sortie de ton programme s’affichera ici… (Ctrl + Entrée pour lancer)</span>');
+  cur.hintUsed=false;cur.solUsed=false;cur.fails=0;
+  updateSolBtn();
+  if(ch.timed&&!save.done[curKey()]){
+    battleTimer=setInterval(()=>{
+      const sp=$('enemy-sprite');
+      sp.classList.remove('lunge');void sp.offsetWidth;sp.classList.add('lunge');
+      setTimeout(()=>damagePlayer(acte.tick,'⏱'),250);
+    },ch.timed*1000*(cls.timerMult||1));}}
+function updateSolBtn(){
+  const ch=CHAPTERS[cur.ci];
+  const btn=$('btn-sol');
+  if(ch.acte===2&&cur.fails<5)btn.textContent='🔒 Solution ('+cur.fails+'/5 échecs)';
+  else btn.textContent='📜 Solution';}
+function setConsole(html){$('console').innerHTML=html;}
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+/* ---------- éditeur + coloration ---------- */
+const codeEl=$('code'),hlEl=$('hl');
+function highlight(){
+  const re=/(#[^\n]*)|((?:f|F)?"(?:[^"\\\n]|\\.)*"?|(?:f|F)?'(?:[^'\\\n]|\\.)*'?)|\b(def|class|return|if|elif|else|while|for|in|and|or|not|break|continue|pass|True|False|None|is)\b|\b(print|len|range|str|int|float|max|min|sum|sorted|abs|round|list|append|type)\b|\b(\d+\.?\d*)\b/g;
+  hlEl.innerHTML=esc(codeEl.value).replace(re,(m,c,s,k,b,n)=>{
+    if(c)return'<span class="c">'+c+'</span>';
+    if(s)return'<span class="s">'+s+'</span>';
+    if(k)return'<span class="k">'+k+'</span>';
+    if(b)return'<span class="b">'+b+'</span>';
+    return'<span class="n">'+n+'</span>';})+'\n';}
+codeEl.addEventListener('input',highlight);
+codeEl.addEventListener('scroll',()=>{hlEl.scrollTop=codeEl.scrollTop;hlEl.scrollLeft=codeEl.scrollLeft;});
+codeEl.addEventListener('keydown',e=>{
+  if(e.key==='Tab'){e.preventDefault();
+    const s=codeEl.selectionStart;
+    codeEl.value=codeEl.value.slice(0,s)+'    '+codeEl.value.slice(codeEl.selectionEnd);
+    codeEl.selectionStart=codeEl.selectionEnd=s+4;highlight();}
+  if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)){e.preventDefault();attack();}});
+
+/* ---------- attaque ---------- */
+function attack(){
+  const ch=CHAPTERS[cur.ci],d=curChallenge(),acte=ACTES[ch.acte];
+  const res=checkChallenge(codeEl.value,d);
+  let html='';
+  if(res.out&&res.out.length)html+=esc(res.out.join('\n'))+'\n';
+  if(res.ok){
+    html+='<span class="ok">✔ SORT RÉUSSI ! '+(cur.mode==='boss'?'Le monstre s’effondre !':'La dalle s’illumine, le passage s’ouvre !')+'</span>';
+    setConsole(html);winChallenge();}
+  else{
+    html+='<span class="err">✘ '+esc(res.msg)+'</span>\n<span class="dim">'+(cur.mode==='boss'?'Le monstre':'La dalle')+' contre-attaque ! (-'+acte.dmg+' PV) — corrige et réessaie.</span>';
+    setConsole(html);failChallenge();}}
+function shootOrb(from,to,color,cb){
+  const o=document.createElement('div');o.className='orb';
+  o.style.background=color;o.style.boxShadow='0 0 20px '+color+',0 0 40px '+color;
+  o.style.left=(from.x-11)+'px';o.style.top=(from.y-11)+'px';
+  document.body.appendChild(o);
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    o.style.left=(to.x-11)+'px';o.style.top=(to.y-11)+'px';}));
+  setTimeout(()=>{o.remove();cb();},360);}
+function classAttackFX(cls,done){
+  const ps=$('player-sprite'),es=$('enemy-sprite');
+  const pr=ps.getBoundingClientRect(),er=es.getBoundingClientRect();
+  const pc={x:pr.left+pr.width/2,y:pr.top+pr.height/2};
+  const ec={x:er.left+er.width/2,y:er.top+er.height/2};
+  ps.style.setProperty('--dx',(ec.x-pc.x)*.82+'px');
+  ps.style.setProperty('--dy',(ec.y-pc.y)*.82+'px');
+  const anim=(cl,t)=>{
+    ps.classList.remove('atk-charge','atk-dash','atk-slam','atk-holy');
+    void ps.offsetWidth;ps.classList.add(cl);setTimeout(done,t);};
+  if(cls.id==='guerrier')anim('atk-charge',300);
+  else if(cls.id==='rogue'){anim('atk-dash',240);setTimeout(()=>burst(ec.x,ec.y,cls.color,22),470);}
+  else if(cls.id==='orc')anim('atk-slam',400);
+  else if(cls.id==='heal')anim('atk-holy',330);
+  else shootOrb(pc,ec,cls.color,done);}
+function winChallenge(){
+  stopTimer();
+  const ch=CHAPTERS[cur.ci],acte=ACTES[ch.acte],cls=myClass();
+  const key=curKey();
+  const base=cur.mode==='boss'?acte.xp*2:acte.xp;
+  let xp=cur.solUsed?base*.3:cur.hintUsed?base*.6:base;
+  xp=Math.round(xp*(cls.xpMult||1));
+  save.done[key]=true;
+  save.best[key]=Math.max(save.best[key]||0,xp);
+  persist();refreshHud();
+  classAttackFX(cls,()=>{
+    const es=$('enemy-sprite'),r=es.getBoundingClientRect();
+    const cx=r.left+r.width/2,cy=r.top+r.height/2;
+    es.classList.remove('hit');void es.offsetWidth;es.classList.add('hit');
+    burst(cx,cy,cls.color,40);
+    burst(cx,cy,'#FFD43B',22);
+    floater(cx,r.top,'+'+xp+' XP','#FFD43B');
+    $('arena').classList.remove('shake');void $('arena').offsetWidth;$('arena').classList.add('shake');
+    sfx.hit();
+    const pips=$('pips').children;
+    if(pips[0])pips[0].classList.add('off');
+    if(cls.healOnWin&&cur.php<100){
+      cur.php=Math.min(100,cur.php+cls.healOnWin);
+      $('php').style.width=cur.php+'%';$('phptxt').textContent='PV '+cur.php+' / 100';
+      const pp=$('player-sprite').getBoundingClientRect();
+      floater(pp.left+pp.width/2,pp.top,'+'+cls.healOnWin+' PV','#7EE787');}
+    setTimeout(()=>{es.classList.add('dead');sfx.win();
+      burst(cx,cy,'#7EE787',60);
+      setTimeout(showVictory,900);},500);});}
+function damagePlayer(dmg,label){
+  dmg=Math.max(1,Math.round(dmg*(myClass().dmgMult||1)));
+  cur.php=Math.max(0,cur.php-dmg);
+  $('php').style.width=cur.php+'%';$('phptxt').textContent='PV '+cur.php+' / 100';
+  const ps=$('player-sprite'),r=ps.getBoundingClientRect();
+  burst(r.left+r.width/2,r.top+r.height/2,'#FF6B6B',22);
+  floater(r.left+r.width/2,r.top,(label||'')+'-'+dmg,'#FF6B6B');
+  $('arena').classList.remove('shake');void $('arena').offsetWidth;$('arena').classList.add('shake');
+  sfx.hurt();
+  if(cur.php<=0){
+    cur.php=100;
+    setTimeout(()=>{$('php').style.width='100%';$('phptxt').textContent='PV 100 / 100';
+      setConsole('<span class="err">💀 KO ! Mais un mage se relève toujours… PV restaurés, le défi continue !</span>');},700);}}
+function failChallenge(){
+  const acte=ACTES[CHAPTERS[cur.ci].acte];
+  cur.fails++;updateSolBtn();
+  damagePlayer(acte.dmg,'');}
+
+/* ---------- victoire ---------- */
+function showVictory(){
+  stopTimer();
+  const ch=CHAPTERS[cur.ci],last=cur.ci===17; /* fin du jeu de base ; les extensions continuent après */
+  const acteFini=!last&&cur.ci<CHAPTERS.length-1&&CHAPTERS[cur.ci+1].acte!==ch.acte;
+  const v=$('vcard');
+  if(cur.mode==='dalle'){
+    const lastDalle=cur.di>=2;
+    v.innerHTML='<div class="spr">💠</div><h2>Dalle '+(cur.di+1)+'/3 franchie !</h2>'+
+    '<p>La dalle s’illumine sous tes pieds et le passage s’ouvre. '+(lastDalle
+      ?'Les 3 dalles du chapitre brillent : au bout du chemin, <b>'+ch.name+'</b> t’attend avec son GRAND PROJET 🏗️ !'
+      :'Avance jusqu’à la dalle suivante pour continuer <b>'+ch.mini+'</b>.')+'</p>'+
+    '<button class="btn-big" id="btn-vnext">🚶 Reprendre la route</button>';}
+  else if(last){
+    v.innerHTML='<div class="spr">🏆</div><h2>LA CITADELLE EST TOMBÉE !</h2>'+
+    '<p>Trois actes, 54 dalles-défis franchies une à une, et 18 GRANDS PROJETS arrachés aux monstres — dont un moteur de combat complet en POO, jugé sur des tests cachés. Ce n’était pas un tutoriel : c’était un entraînement. Ton rang : <b style="color:var(--or)">'+rankName()+'</b> ('+totalXP()+' XP sur '+maxXP()+').</p>'+
+    '<p>🗺️ Et ce n’est pas fini : <b>le monde s’agrandit chaque semaine</b> — de nouvelles portes ⛩️ s’ouvriront en bas de la carte avec de nouveaux actes.</p>'+
+    '<div class="next-steps"><b>🚀 La suite, hors du jeu :</b><br>'+
+    '1. Vise le rang EXPERT LÉGENDAIRE : refais les dalles et projets des Actes II et III sans aucun indice.<br>'+
+    '2. Installe le vrai Python (python.org) et recode le fil rouge (ton RPG) en y ajoutant TES idées : magie, boutique, sauvegarde.<br>'+
+    '3. exercism.org (piste Python, gratuit) : 1 exercice par jour avec correction humaine.<br>'+
+    '4. Puis codewars.com — les katas 7 kyu te sembleront familiers : ce sont les défis du Juge.<br>'+
+    '5. Le vrai niveau expert vient des projets : automatise un truc de TA vie (fichiers, Excel, web).</div>'+
+    '<button class="btn-big" id="btn-vnext">Retour à la carte</button>';}
+  else if(acteFini){
+    const na=ACTES[ch.acte+1];
+    v.innerHTML='<div class="spr">🌟</div><h2>'+ACTES[ch.acte].name+' : TERMINÉ !</h2>'+
+    '<p>Le GRAND PROJET de '+ch.name+' est à toi, et avec lui tout l’acte. Rang : <b style="color:var(--or)">'+rankName()+'</b>.</p>'+
+    '<p>⚠️ Le niveau monte : la porte ⛩️ vers <b>'+na.name+'</b> est ouverte — dégâts ennemis '+na.dmg+' PV, mais '+na.xp+' XP par dalle et '+(na.xp*2)+' XP par projet. '+(ch.acte===1?'Et là-bas, les solutions sont verrouillées et certains tests sont cachés…':'')+'</p>'+
+    '<button class="btn-big" id="btn-vnext">🚶 Reprendre la route</button>';}
+  else{
+    v.innerHTML='<div class="spr">'+ch.emoji+'</div><h2>'+ch.name+' est vaincu !</h2>'+
+    '<p>Son GRAND PROJET 🏗️ est à toi — <b>'+ch.mini+'</b> : acquis ! Rang actuel : <b style="color:var(--or)">'+rankName()+'</b>. Les dalles du chapitre suivant t’attendent sur le chemin.</p>'+
+    '<button class="btn-big" id="btn-vnext">🚶 Reprendre la route</button>';}
+  $('overlay').classList.add('show');
+  $('btn-vnext').onclick=()=>{
+    $('overlay').classList.remove('show');
+    renderMap();show('screen-map');};}
+
+/* ---------- boutons ---------- */
+$('btn-start').onclick=()=>{sfx.click();
+  if(save.cls==null){renderSelect();show('screen-select');}
+  else{show('screen-map');renderMap();}};
+$('btn-hero').onclick=()=>{sfx.click();renderSelect();show('screen-select');};
+$('btn-back').onclick=()=>{sfx.click();stopTimer();show('screen-map');renderMap();};
+$('btn-run').onclick=attack;
+$('btn-hint').onclick=()=>{
+  const d=curChallenge(),cls=myClass();
+  const hb=$('hintbox');const n=Math.min(parseInt(hb.dataset.n||'0'),d.hints.length-1);
+  const free=cls.freeHint&&n===0;
+  hb.innerHTML='💡 <b>Indice '+(n+1)+'/'+d.hints.length+' :</b> '+esc(d.hints[n])+
+    (free?' <span style="color:var(--ok)">(gratuit — Savoir ancien 📖)</span>':'');
+  hb.dataset.n=String(n+1);hb.classList.add('show');
+  if(!free)cur.hintUsed=true;
+  sfx.click();};
+$('btn-sol').onclick=()=>{
+  const ch=CHAPTERS[cur.ci],d=curChallenge();
+  if(ch.acte===2&&cur.fails<5){
+    setConsole('<span class="dim">🔒 Dans la Citadelle des Experts, la solution se mérite : elle se débloque après 5 tentatives ratées ('+cur.fails+'/5). Bats-toi encore — c’est comme ça qu’on apprend.</span>');
+    sfx.click();return;}
+  let sol=d.solution;
+  if(d.type==='predict'){
+    try{sol=runPython(d.show,null).out.join('\n');}catch(_){sol='';}}
+  codeEl.value=sol;highlight();cur.solUsed=true;sfx.click();
+  setConsole('<span class="dim">📜 Solution copiée dans le grimoire. Lis-la ligne par ligne, puis lance le sort. (XP fortement réduite)</span>');};
+$('btn-mute').onclick=function(){muted=!muted;this.textContent=muted?'🔇 Muet':'🔊 Son';};
+let resetArmed=false;
+$('btn-reset').onclick=function(){
+  if(!resetArmed){resetArmed=true;this.textContent='⚠ Clique encore pour confirmer';
+    setTimeout(()=>{resetArmed=false;this.textContent='↺ Tout recommencer';},2500);return;}
+  save={done:{},best:{},cls:save.cls};persist();resetArmed=false;this.textContent='↺ Tout recommencer';
+  P.x=2.5*TILE;P.y=3.5*TILE;renderMap();};
+
+$('btn-board').onclick=showBoard;
+$('btn-logout').onclick=async()=>{if(sb)try{await sb.auth.signOut();}catch(_){}location.reload();};
+if(sb){
+  $('btn-login').onclick=()=>doAuth('login');
+  $('btn-signup').onclick=()=>doAuth('signup');
+  $('btn-guest').onclick=()=>{SAVE_KEY='pyquest';loadLocal();refreshHud();show('screen-title');};
+  $('l-pass').addEventListener('keydown',e=>{if(e.key==='Enter')doAuth('login');});}
+
+refreshHud();
+bootAuth();
+</script>
+
+
+</body>
+</html>

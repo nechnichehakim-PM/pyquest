@@ -1210,9 +1210,11 @@ function layoutWorld(){
     WALLS.push(wall);
     const prev=NODES[NODES.length-1];
     GATES.push({c:prev[0],r:wall,next:ea.first});
+    /* le 1er monstre est du côté de la porte, les suivants s'écartent
+       sur toute la largeur : les segments sont longs, les 3 dalles y tiennent */
     const dir=prev[0]>22?-1:1;
     const x0=dir>0?6:38;
-    const step=ea.count>1?Math.min(10,Math.floor(32/(ea.count-1))):0;
+    const step=ea.count>1?Math.floor(32/(ea.count-1)):0;
     for(let j=0;j<ea.count;j++)
       NODES.push([Math.max(2,Math.min(WCOLS-3,x0+dir*j*step)),wall+(j%2?7:4)]);});
   WROWS=30+10*extActes.length;

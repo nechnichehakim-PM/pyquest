@@ -33,11 +33,13 @@ progression en ligne, classement entre amis, et **le monde s'agrandit chaque sem
 
 ## Expansion hebdomadaire
 
-Une routine planifiée (agent Claude) suit `tools/ROUTINE.md` : chaque semaine elle ajoute
-un acte (2 chapitres : 6 dalles + 2 projets) daté du lundi suivant dans
-`content/extensions.js`, exécute `node tools/validate.js`, puis commit + push.
-Le jeu débloque automatiquement chaque acte à sa date `dispo` — la carte s'agrandit
-d'une bande de 10 lignes avec une nouvelle porte ⛩️.
+Le jeu débloque automatiquement chaque acte à sa date `dispo` (un lundi) — la carte
+s'agrandit d'une bande de 10 lignes avec une nouvelle porte ⛩️. Un stock d'actes
+d'avance est maintenu dans `content/extensions.js` (actuellement jusqu'au 2026-08-03).
+
+Pour recharger le stock : ouvrir Claude Code dans ce dossier et dire
+**« génère l'acte de la semaine »** — le protocole complet est dans `CLAUDE.md`
+et `tools/ROUTINE.md` (génération → validation `node tools/validate.js` → push).
 
 ## Développement local
 

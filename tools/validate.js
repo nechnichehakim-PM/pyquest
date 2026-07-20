@@ -103,7 +103,7 @@ const wsandbox = {
   console, CHAPTERS,
   save: { done: {} },
   chapterUnlocked: () => true,
-  document: { createElement: () => ({ getContext: () => new Proxy({}, { get: () => () => {}, set: () => true }), width: 0, height: 0 }) }
+  document: { createElement: () => ({ getContext: () => new Proxy({}, { get: () => (() => ({ addColorStop: () => {} })), set: () => true }), width: 0, height: 0 }) }
 };
 vm.createContext(wsandbox);
 vm.runInContext(worldCode + `
